@@ -8,7 +8,7 @@ flowchart LR
     PGraw --> SHIP
   end
 
-  subgraph GCP["GCP: BigQuery Sandbox"]
+  subgraph GCP["GCP: BigQuery (free tier)"]
     BQraw[("raw_pay.*<br/>nested JSON / ARRAY&lt;STRUCT&gt;")]
     REP[("ship_replica.*")]
     UDL["dbt: ruta_udl<br/>stg_pay (UNNEST/JSON)<br/>entity resolution<br/>conformed dims + facts"]

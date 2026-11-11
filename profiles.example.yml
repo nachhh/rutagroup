@@ -1,0 +1,30 @@
+# Copy to ./profiles.yml (gitignored). The Makefile sets DBT_PROFILES_DIR to the repo root.
+# All secrets come from .env via env_var(); BigQuery uses gcloud ADC (method: oauth), no key file.
+ruta_ship:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('PG_HOST', 'localhost') }}"
+      port: "{{ env_var('PG_PORT', '5432') | int }}"
+      user: "{{ env_var('PG_USER', 'ruta') }}"
+      password: "{{ env_var('PG_PASSWORD', 'ruta') }}"
+      dbname: "{{ env_var('PG_DB', 'ruta') }}"
+      schema: ship        # → ship_staging, ship_marts (dbt appends +schema)
+      threads: 4
+
+ruta_udl:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth       # Application Default Credentials
+      project: "{{ env_var('GCP_PROJECT') }}"
+      dataset: udl        # → udl_staging, udl_intermediate, udl_marts
+      location: "{{ env_var('BQ_LOCATION', 'US') }}"
+      threads: 4
+      job_execution_timeout_seconds: 300
+      priority: interactive
+      # Cost guardrail: any single query scanning more than this fails instead of billing.
+      # Cost governance as code (BQ on-demand pricing is per byte scanned).
+      maximum_bytes_billed: 1000000000   # 1 GB

@@ -17,3 +17,10 @@ Grows phase by phase. Format: **English** · *Español*: one-line definition.
 | Entity resolution | Resolución de entidades | Determining which records refer to the same real-world entity |
 | Data contract | Contrato de datos | An enforced schema/semantics promise of a data product to its consumers |
 | Lineage | Linaje | The traceable path of data from source to consumption |
+| Application Default Credentials (ADC) | Credenciales predeterminadas de aplicación | Google auth that picks up your gcloud user token, so no key files are needed |
+| dbt profile / target | Perfil / destino de dbt | Connection config outside the repo; the target selects the environment (dev/prod) |
+| DISTKEY / SORTKEY (Redshift) | Clave de distribución / de ordenamiento | How rows are spread across nodes / ordered on disk for pruning |
+| Sandbox (BigQuery) | Sandbox / entorno de pruebas | Free BQ without billing: no DML, no streaming, 60-day table expiry |
+| maximum_bytes_billed | Máximo de bytes facturados | Per-query cap: a BQ query that would scan more fails instead of billing |
+| insert_overwrite (dbt/BQ) | Sobrescritura de particiones | Incremental strategy that replaces whole partitions instead of merging rows |
+| Fusion engine (dbt v2) | Motor Fusion | dbt's Rust rewrite: faster parsing, static analysis, ADBC adapters |

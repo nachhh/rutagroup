@@ -32,9 +32,10 @@ specs are in [specs/](specs/).
 
 - Python 3.12 via `uv` (system Python is 3.14, which dbt doesn't support well). Airflow lives in a
   separate venv to avoid dependency conflicts with dbt.
-- Postgres 16 in Docker plays **Redshift** (RutaShip). The **BigQuery Sandbox** hosts RutaPay
-  and the UDL. Sandbox limits: no DML (`INSERT/UPDATE/MERGE`), so no incremental MERGE or
-  snapshots on BQ; tables expire after 60 days; no GCS without billing.
+- Postgres 16 in Docker plays **Redshift** (RutaShip). **BigQuery (free tier, billing enabled)**
+  hosts RutaPay and the UDL. DML works. Stay inside the free tier (1 TB query / 10 GB storage per
+  month): the dbt profile caps queries with `maximum_bytes_billed: 1 GB`. Never enable paid
+  features (editions/reservations, paid masking) without asking. The data is ~40 MB.
 - BQ auth uses gcloud ADC (`gcloud auth application-default login`), never a key file in the repo.
 - Use BigQuery-native SQL generously in BQ models (STRUCT/ARRAY, UNNEST, JSON functions,
   QUALIFY, SAFE_*, GENERATE_DATE_ARRAY, EDIT_DISTANCE, partition/cluster configs) and comment

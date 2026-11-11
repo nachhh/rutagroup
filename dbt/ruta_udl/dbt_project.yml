@@ -1,0 +1,26 @@
+# Ruta UDL: runs on BigQuery (free tier). Unifies RutaPay (native BQ, nested JSON) with the
+# RutaShip replica, resolves the canonical Customer, and hosts the semantic layer + knowledge graph.
+# Cost guardrail: maximum_bytes_billed in the profile; partition + cluster large marts.
+name: ruta_udl
+version: "1.0.0"
+config-version: 2
+profile: ruta_udl
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  ruta_udl:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts

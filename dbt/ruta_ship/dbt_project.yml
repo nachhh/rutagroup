@@ -1,0 +1,25 @@
+# RutaShip: runs on Postgres, our stand-in for Amazon Redshift (AWS legacy stack).
+# Upstream project: its PUBLIC marts are replicated to BigQuery and become sources of ruta_udl
+# (a hand-rolled version of dbt Mesh cross-project refs).
+name: ruta_ship
+version: "1.0.0"
+config-version: 2
+profile: ruta_ship
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  ruta_ship:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: ephemeral
+    marts:
+      +materialized: table
+      +schema: marts

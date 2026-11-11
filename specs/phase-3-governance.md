@@ -14,7 +14,7 @@ Deliverable: `docs/03_governance.md`, centered on a **concept → artifact** tab
 | Classification | Column `meta: {pii: true, classification: confidential\|internal\|public}` + `tags: ['pii']` | yml |
 | Policy enforcement (CI) | `scripts/check_governance.py` reads `manifest.json` and fails if: a public model exposes an unmasked PII column, a public model has no contract or owner, or a mart has no PK test | script + `make govern` |
 | Masking / least privilege, PG ("Redshift") | Roles `analyst`, `pii_reader`. `grants` config. Masked view uses a `mask_email()` macro. RLS policy by region (concept demo) | `macros/mask.sql`, `dbt_project.yml` grants |
-| Masking, BQ (conceptual + snippet) | **Policy tags** (Data Catalog taxonomy) + **dynamic data masking**, **authorized views**, **row access policies**. Mostly unavailable in Sandbox, so documented with a snippet | doc |
+| Masking, BQ (hands-on where free) | **Policy tags** (Data Catalog taxonomy, attached via dbt `policy_tags` column config) + **row access policy** + **authorized view**. **Dynamic data masking**: hands-on only if it's available without a paid edition, otherwise a snippet | `scripts/setup_bq_governance.py`, yml |
 | Redshift equivalents | **Dynamic Data Masking** policies, RLS, Lake Formation for Spectrum | doc |
 | Quality SLAs | tests + severity + source freshness (Phase 2) | |
 | Lineage & discovery | `dbt docs`, **exposures** (`metrics_mcp_server`, `exec_dashboard`), manifest/catalog artifacts, OpenLineage via Airflow (Phase 7) | `models/_exposures.yml` |

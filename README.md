@@ -13,6 +13,59 @@ How the project is run:
 
 ---
 
+## Requirements
+
+| Tool | Why | Install |
+|---|---|---|
+| **Docker Desktop** | Runs Postgres 16 (our stand-in for Redshift) | [docker.com](https://www.docker.com/products/docker-desktop/) |
+| **uv** | Python 3.12 env + deps (dbt, MetricFlow, BigQuery client) | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| **gcloud CLI** | Auth to BigQuery via Application Default Credentials (no key files) | `brew install --cask google-cloud-sdk` |
+| **A GCP project** with BigQuery enabled | Hosts RutaPay + the UDL. The free tier is plenty: the data is ~40 MB, and the dbt profile caps any query at 1 GB scanned | [console.cloud.google.com](https://console.cloud.google.com/bigquery) |
+| `make` | Task runner (preinstalled on macOS/Linux) | |
+
+## Quick start
+
+```bash
+# 1. GCP auth (once). Uses your user credentials via ADC; no service-account keys in the repo
+gcloud auth login
+gcloud config set project <your-project-id>
+gcloud auth application-default login
+gcloud auth application-default set-quota-project <your-project-id>
+
+# 2. Local config (both files are gitignored)
+cp .env.example .env                     # set GCP_PROJECT=<your-project-id>
+cp profiles.example.yml profiles.yml     # dbt profiles; the Makefile points DBT_PROFILES_DIR here
+
+# 3. Python env + dbt packages
+uv sync
+make deps
+
+# 4. Start Postgres ("Redshift"), generate data, load both warehouses
+make up          # docker compose up -d --wait
+make data        # synthetic data → ./data (deterministic, seed 42)
+make load        # RutaShip CSV → Postgres raw_ship ; RutaPay JSONL → BigQuery raw_pay
+make debug       # dbt debug in both projects
+
+# 5. Build
+make ship        # dbt build: ruta_ship on Postgres
+make udl         # dbt build: ruta_udl on BigQuery
+```
+
+Coming in later phases (targets are added as each phase lands):
+
+```bash
+make replicate   # Phase 4: RutaShip marts → BigQuery ship_replica (simulated UNLOAD → S3 → GCS → BQ)
+make govern      # Phase 3: governance policy checks over manifest.json
+make mf Q="..."  # Phase 5: MetricFlow queries, e.g. --metrics total_revenue --group-by customer__region
+make ask Q="..." # Phase 6: natural-language question → MCP → semantic layer
+make all         # whole pipeline end-to-end (same steps as the Airflow DAG, Phase 7)
+make down        # stop Postgres (data persists in the Docker volume)
+```
+
+`make help` lists all targets.
+
+---
+
 ## 1. The business
 
 **Ruta Group** is a logistics-tech holding that grew by acquisition. It builds connected workflows
@@ -22,7 +75,7 @@ run on **different clouds**:
 | Product | What it does | Warehouse | Here |
 |---|---|---|---|
 | **RutaShip** | B2B freight marketplace: shippers book shipments, carriers move them, tracking events flow back | **Amazon Redshift** (legacy AWS stack) | **Postgres 16** in Docker (Redshift is a Postgres 8 fork, so the dialect feels similar) |
-| **RutaPay** | Invoicing, subscriptions and payments for the same SMB customers | **BigQuery** (acquired GCP startup) | **BigQuery Sandbox** (real BQ, free, no card) |
+| **RutaPay** | Invoicing, subscriptions and payments for the same SMB customers | **BigQuery** (acquired GCP startup) | **BigQuery** free tier (1 TB query / 10 GB storage per month) |
 
 The **Unified Data Layer (UDL)** lives in **BigQuery**. RutaShip data is replicated from
 "Redshift" into BQ. This simulates `UNLOAD → S3 → GCS → BQ`.
@@ -48,7 +101,7 @@ Why it's hard, and what each difficulty teaches:
 ## 2. Architecture (summary)
 
 ```
-Postgres ("Redshift")                         BigQuery Sandbox
+Postgres ("Redshift")                         BigQuery (free tier)
 ┌───────────────────────────┐   replicate    ┌──────────────────────────────────────────────┐
 │ raw_ship.*                │   (Parquet,    │ raw_pay.*  (nested JSON, ARRAY<STRUCT>)      │
 │ dbt project: ruta_ship    │──"UNLOAD"────▶ │ ship_replica.*                               │
@@ -74,9 +127,10 @@ Full Mermaid diagrams are in [docs/diagrams/](docs/diagrams/):
 become the downstream project's sources. This is a hand-rolled version of the **dbt Mesh**
 pattern. In dbt Cloud, cross-project `ref` handles this.
 
-**Why split work between engines?** The BQ Sandbox has no DML, so incremental `MERGE` and
-dbt snapshots go on the Postgres side. On the BQ side we build SCD2 from a change log with window
-functions. That gives us two ways to do SCD2, which is a good interview talking point.
+**How SCD2 and incrementals are split between engines:** Postgres gets the dbt **snapshot**
+(SCD2 the dbt way) and an incremental `merge`. BigQuery gets SCD2 **derived from a change log** with
+window functions, plus an incremental `insert_overwrite` on a date-partitioned table, the
+classic BQ cost pattern. Two approaches to each problem, each with trade-offs worth discussing.
 
 ---
 
@@ -87,7 +141,7 @@ Weak-point focus: **Phases 4–6 are protected**. Phases 1–3 are tight refresh
 | # | Phase | ⏱ | Spec |
 |---|---|---|---|
 | **Session 1** ||||
-| 0 | Setup: Docker PG, uv, BQ Sandbox auth, data generator, both dbt projects | 45 m | [phase-0](specs/phase-0-setup.md) |
+| 0 | Setup: Docker PG, uv, BigQuery auth, data generator, both dbt projects | 45 m | [phase-0](specs/phase-0-setup.md) |
 | 1 | Data modeling refresher: grain, fact types, conformed dims, SCD, bus matrix | 40 m | [phase-1](specs/phase-1-data-modeling.md) |
 | 2 | dbt refresher on both engines: materializations, incremental, snapshots, tests, BQ nested SQL | 1.5 h | [phase-2](specs/phase-2-dbt.md) |
 | 3 | Governance → code: contracts, access, groups, PII meta, masking, grants, CI check | 45 m | [phase-3](specs/phase-3-governance.md) |
@@ -103,7 +157,7 @@ Total ≈ 7.75 h. That is the top of the budget. If we run behind, cut in this o
 
 ## 4. Progress
 
-- [ ] Phase 0: Setup
+- [x] Phase 0: Setup
 - [ ] Phase 1: Data modeling
 - [ ] Phase 2: dbt refresher
 - [ ] Phase 3: Governance → code
