@@ -1,0 +1,42 @@
+# --- private / interview-specific (repo is public) ---
+docs/job_posting.md
+CLAUDE.local.md
+quizzes/
+
+# --- secrets & credentials ---
+.env
+.env.*
+!.env.example
+*.json.key
+*service-account*.json
+*credentials*.json
+gcp-key*.json
+profiles.yml
+!profiles.example.yml
+
+# --- python / uv ---
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# --- dbt ---
+target/
+dbt_packages/
+logs/
+.user.yml
+
+# --- airflow ---
+airflow_home/
+*.db
+
+# --- data artifacts ---
+data/
+*.parquet
+*.csv.gz
+
+# --- OS / editor ---
+.DS_Store
+.vscode/
+.idea/

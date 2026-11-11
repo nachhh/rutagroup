@@ -1,0 +1,59 @@
+# Phase 2: dbt refresher on both engines (⏱ 1.5 h)
+
+## Goal
+Build staging → intermediate → marts in both projects. Every key dbt concept appears at least once
+in code, with a comment explaining the choice.
+
+## `ruta_ship` (Postgres ≈ Redshift)
+| Model | Materialization | Why / concept |
+|---|---|---|
+| `stg_ship__shippers`, `__carriers`, `__lanes`, `__shipments` | `view` | Cheap 1:1 cleanup layer |
+| `stg_ship__shipment_events` | `view` | |
+| `int_shipments_enriched` | `ephemeral` | Inlined CTE, no object created |
+| `fct_shipments` | `incremental`, `merge`, `unique_key=shipment_id`, 3-day lookback | Late status updates. `is_incremental()`, `on_schema_change='append_new_columns'` |
+| `fct_shipment_events` | `incremental`, `append` (or `microbatch` on `event_ts`) | Immutable event log |
+| `fct_shipment_lifecycle` | `table` | Accumulating snapshot rebuilt from events |
+| `dim_shipper` | `table` | Built from the snapshot below |
+| `snapshots/snap_shippers.yml` | snapshot, `timestamp` strategy on `updated_at` | **SCD2 the dbt way** |
+| `mv_daily_lane_volume` | `materialized_view` | Show it exists; discuss refresh trade-offs |
+
+On Redshift you'd add `dist`/`sort` configs. We write them as comments, since dbt-postgres ignores them.
+
+## `ruta_udl` (BigQuery Sandbox): BigQuery-native SQL showcase
+| Model | BQ features used |
+|---|---|
+| `stg_pay__accounts` | `billing_contact.email` (STRUCT dot access), `UNNEST(addresses) WITH OFFSET`, `ARRAY_AGG(... ORDER BY ... LIMIT 1)[OFFSET(0)]` to pick the primary address, `REGEXP_REPLACE` to normalize tax_id, `SELECT * EXCEPT/REPLACE` |
+| `stg_pay__invoices` | Invoice header + `JSON_VALUE(metadata, '$.shipment_ref')` (cross-product link!), `SAFE_CAST` |
+| `stg_pay__invoice_lines` | `CROSS JOIN UNNEST(lines) AS l WITH OFFSET AS line_idx`. Explodes ARRAY<STRUCT> to one row per line |
+| `stg_pay__payment_events` | Webhook JSON: `JSON_VALUE(payload,'$.type')`, `JSON_QUERY(payload,'$.data.method')`, `JSON_QUERY_ARRAY` for refunds, dedup with `QUALIFY ROW_NUMBER() OVER (PARTITION BY event_id ORDER BY received_at DESC) = 1` |
+| `int_subscriptions_scd2` | **SCD2 from a change log** via `LEAD(changed_at) OVER (PARTITION BY account_id ORDER BY changed_at)` → `valid_from/valid_to/is_current`. This is the alternative to snapshots when there's no DML |
+| `dim_date` | `UNNEST(GENERATE_DATE_ARRAY(...))` |
+| marts | `table` with `partition_by={'field':'issued_date','data_type':'date'}` and `cluster_by=['customer_key']`. Comments explain cost/pruning |
+
+Also covered: `PIVOT` (plan mix per month), `APPROX_COUNT_DISTINCT`, `SAFE_DIVIDE`,
+`DATE_TRUNC`, and an `ARRAY_AGG(STRUCT(...))` going the other way (re-nesting for an API-style output).
+
+## Tests (both projects)
+- Generic: `unique`, `not_null`, `accepted_values`, `relationships`
+- `dbt_utils.unique_combination_of_columns`, `expression_is_true`
+- Singular: `tests/assert_invoice_total_equals_sum_of_lines.sql`
+- **Unit test** (dbt ≥ 1.8): tax_id normalization and SCD2 validity windows, with mocked inputs
+- `severity: warn` + `warn_if` / `error_if` thresholds, `store_failures` (Postgres only, since it needs DML/CTAS)
+- Source **freshness** on `raw_ship.shipment_events` and `raw_pay.payment_events`
+
+## Other concepts touched
+`ref` vs `source`, seeds (`seed_plans.csv`, `seed_region_map.csv`), a macro (`normalize_tax_id`,
+written cross-database with `adapter.dispatch`), `dbt build` vs `run` + `test`, selectors (`+fct_shipments`,
+`tag:pii`, `state:modified+` with `--defer`), and `dbt docs generate`.
+
+## Acceptance criteria
+- `dbt build` passes in both projects
+- At least: 1 incremental merge, 1 append/microbatch, 1 snapshot, 1 log-derived SCD2, 1 unit test, 1 singular test
+- Every BQ feature in the table above appears in at least one model
+
+## 🧭 Checkpoints
+1. Incremental strategy and lookback for `fct_shipments` (merge vs delete+insert)
+2. Primary address rule for multi-address accounts
+3. Is a mismatch in invoice total vs sum of lines `warn` or `error`?
+
+## 🧠 Quiz 2: 8 questions (materializations, incremental strategies, snapshots vs log SCD2, unit vs data tests, UNNEST semantics, QUALIFY, partition vs cluster, `--defer`)
