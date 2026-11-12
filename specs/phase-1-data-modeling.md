@@ -34,7 +34,15 @@ Be able to explain *why* the marts look the way they do: grain, fact type, dimen
 | `fct_customer_monthly` | 1 row per customer per month | periodic snapshot | customer, month |
 | `dim_customer` | 1 row per customer version (SCD2) | dimension | canonical across products |
 
-## 🧭 Checkpoints
+## 🧭 Decisions (settled)
+1. **Shipments grain → A:** `fct_shipments` (per shipment, incremental merge) + `fct_shipment_events`
+   (append-only: events arrive unannounced) + `fct_shipment_lifecycle` (accumulating snapshot).
+2. **dim_customer SCD:** SCD2 on `plan_code`, `ship_tier`, **`region`** (+ `current_region`, type 6 lite).
+   SCD1 on `legal_name` (audit copy `billed_legal_name` on the invoice fact) and contacts (PII minimization).
+   Facts carry the durable `customer_key` and join as-of at query time (MetricFlow `validity_params`).
+3. **No OBT.** The semantic layer serves NL/agents.
+
+## 🧭 Checkpoints (original)
 1. Grain of the shipments fact: shipment vs shipment-event (or both)?
 2. Is `dim_customer` SCD2, and on which attributes?
 3. Should we add a wide OBT (`obt_customer_360`) for AI/NL consumers, or let the semantic layer handle the joins?

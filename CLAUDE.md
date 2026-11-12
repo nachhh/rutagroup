@@ -17,8 +17,11 @@ specs are in [specs/](specs/).
 4. **Quizzes (🧠).** Ask in chat one question at a time. The user answers before seeing the solution.
    Once a quiz is settled, write it (questions, user's answers, feedback) to
    `quizzes/quiz-<n>-<title>.md`. `quizzes/` is gitignored.
-5. **Git: always ask first** before any commit, branch, merge, push, or tag. Suggested cadence:
-   one commit per phase.
+5. **Git: always ask first** before any commit, branch, merge, push, or tag.
+   - From Phase 1 on, each phase gets its own branch off `main`: `phase-<n>-<short-description>`
+     (e.g. `phase-1-data-modeling`). Phase 0 went straight to `main`.
+   - Commit messages: `Phase <n>: <description>`.
+   - At the end of a phase: commit on the branch → (ask) merge into `main` → (ask) push.
 6. **Public repo hygiene.** Never commit secrets, keys, `profiles.yml`, `.env`, the job posting,
    `CLAUDE.local.md`, or `quizzes/`. Check `git status` before proposing a commit. Keep committed
    text neutral: no references to a specific employer or interview.

@@ -17,7 +17,9 @@ in code, with a comment explaining the choice.
 | `snapshots/snap_shippers.yml` | snapshot, `timestamp` strategy on `updated_at` | **SCD2 the dbt way** |
 | `mv_daily_lane_volume` | `materialized_view` | Show it exists; discuss refresh trade-offs |
 
-On Redshift you'd add `dist`/`sort` configs. We write them as comments, since dbt-postgres ignores them.
+**Physical design per engine** (from the Quiz 1 discussion): Postgres uses **indexes** (dbt `indexes=[{'columns': ['shipment_id'], 'unique': True}]`, a BRIN index on time columns).
+Redshift has no indexes and uses `dist`/`sort` (dbt-redshift `dist='shipment_id'`, `sort='booked_at'`), written as comments next to the PG config.
+BigQuery uses `partition_by`/`cluster_by`. `incremental_predicates` (to prune the MERGE target) works on all three.
 
 ## `ruta_udl` (BigQuery): BigQuery-native SQL showcase
 | Model | BQ features used |

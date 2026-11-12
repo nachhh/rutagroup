@@ -158,7 +158,7 @@ Total ≈ 7.75 h. That is the top of the budget. If we run behind, cut in this o
 ## 4. Progress
 
 - [x] Phase 0: Setup
-- [ ] Phase 1: Data modeling
+- [x] Phase 1: Data modeling
 - [ ] Phase 2: dbt refresher
 - [ ] Phase 3: Governance → code
 - [ ] Phase 4: UDL / ontology / KG
