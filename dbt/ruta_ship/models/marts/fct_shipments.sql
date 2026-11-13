@@ -9,8 +9,8 @@
     * Best practice when available: filter on a load timestamp (_loaded_at) instead of a business one.
 
   PHYSICAL DESIGN per engine:
-    * Postgres (here): indexes → unique B-tree on shipment_id (the MERGE match), BRIN on booked_date
-      (tiny index for naturally time-ordered data).
+    * Postgres (here): the contract's primary_key constraint on shipment_id creates the unique B-tree
+      (the MERGE match) and is ENFORCED; BRIN on booked_date (tiny index for time-ordered data).
     * Redshift (real RutaShip): no indexes. Use  dist='shipper_id'  sort=['booked_date']
       (co-locate with shippers for joins; zone maps prune by date).
     * At scale, prune the MERGE target with incremental_predicates, e.g.
@@ -21,10 +21,7 @@
     incremental_strategy='merge',
     unique_key='shipment_id',
     on_schema_change='append_new_columns',
-    indexes=[
-      {'columns': ['shipment_id'], 'unique': True},
-      {'columns': ['booked_date'], 'type': 'brin'},
-    ],
+    indexes=[{'columns': ['booked_date'], 'type': 'brin'}],
 ) }}
 
 with shipments as (

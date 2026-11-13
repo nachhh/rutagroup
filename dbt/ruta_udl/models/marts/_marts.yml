@@ -1,39 +1,106 @@
 version: 2
 
+# Same governance legend as ruta_ship (scripts/check_governance.py enforces it).
+# BigQuery note: constraints are INFORMATIONAL (`primary key ... not enforced`). The optimizer can use them
+# (join elimination), but nothing rejects duplicates → the unique/not_null tests stay mandatory.
+
 models:
   - name: dim_date
+    description: "Grain: 1 row per day (2023–2027). Conformed, role-playing date dimension."
+    config:
+      group: udl_core
+      access: public
+      contract: {enforced: true}
+      meta: {classification: public}
     columns:
       - name: date_day
+        data_type: date
+        constraints: [{type: primary_key}]
         data_tests: [unique, not_null]
+      - {name: week_start, data_type: date}
+      - {name: month_start, data_type: date}
+      - {name: quarter_start, data_type: date}
+      - {name: year, data_type: int64}
+      - {name: iso_week, data_type: int64}
+      - {name: day_name, data_type: string}
+      - {name: is_weekend, data_type: bool}
+
   - name: fct_invoice_lines
     description: "Grain: 1 row per invoice line. Incremental insert_overwrite on issued_date partitions (7-day lookback)."
+    config:
+      access: public
+      contract: {enforced: true}
+      meta: {classification: internal}
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [invoice_id, line_no]
     columns:
+      - {name: invoice_id, data_type: string}
+      - {name: line_no, data_type: int64}
+      - {name: invoice_number, data_type: string, description: "Degenerate dimension."}
+      - {name: account_id, data_type: string}
+      - {name: issued_at, data_type: timestamp}
+      - {name: issued_date, data_type: date}
+      - {name: invoice_status, data_type: string}
+      - {name: sku, data_type: string}
+      - {name: revenue_type, data_type: string}
       - name: plan_code
+        data_type: string
         description: "Plan at issue time (as-of SCD2 join). Null only for accounts without an active subscription."
         data_tests:
           - not_null:
               config:
                 severity: warn
                 where: "revenue_type in ('subscription', 'txn_fee')"
+      - {name: currency, data_type: string}
+      - {name: qty, data_type: numeric}
+      - {name: unit_amount, data_type: numeric}
+      - {name: net_amount, data_type: numeric}
+      - {name: tax_rate, data_type: numeric}
+      - name: billed_legal_name
+        data_type: string
+        description: "Legal name as printed on the invoice (document of record). A company name, not personal data."
+        config: {meta: {classification: internal}}
+      - {name: _dbt_loaded_at, data_type: timestamp}
+
   - name: fct_payments
     description: "Grain: 1 row per invoice with payment activity. Incremental merge on invoice_id."
+    config:
+      access: public
+      contract: {enforced: true}
+      meta: {classification: internal}
     columns:
       - name: invoice_id
+        data_type: string
+        constraints: [{type: primary_key}]
         data_tests: [unique, not_null]
+      - {name: account_id, data_type: string}
+      - {name: currency, data_type: string}
+      - {name: due_date, data_type: date}
+      - {name: paid_at, data_type: timestamp}
+      - {name: paid_date, data_type: date}
+      - {name: is_paid, data_type: bool}
+      - {name: is_late, data_type: bool}
+      - {name: failed_attempts, data_type: int64}
+      - {name: amount_paid, data_type: numeric}
       - name: amount_refunded
+        data_type: numeric
         data_tests:
           - dbt_utils.expression_is_true:
               arguments:
                 expression: "<= coalesce(amount_paid, 0)"
+      - {name: method_type, data_type: string}
+      - {name: last_event_at, data_type: timestamp}
+
   - name: rpt_plan_mix_monthly
+    description: "Grain: 1 row per month. Protected: presentation-shaped, columns change when plans change."
     columns:
       - name: month
         data_tests: [unique, not_null]
+
   - name: exp_account_invoices_nested
+    description: "Grain: 1 row per account. Protected: export shape for apps/agents, not a stable contract yet."
     columns:
       - name: account_id
         data_tests: [unique, not_null]

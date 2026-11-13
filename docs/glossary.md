@@ -68,3 +68,26 @@ Grows phase by phase. Format: **English** · *Español*: one-line definition.
 | HyperLogLog++ (APPROX_COUNT_DISTINCT) | HyperLogLog++ | Approximate distinct count: tiny memory, ~1% error |
 | Document of record | Documento fehaciente | The legally issued artifact (invoice) whose values must be kept as issued |
 | On-demand minimum billing (BQ) | Facturación mínima on-demand | BigQuery bills at least 10 MB per table referenced in a query |
+| Data product | Producto de datos | A dataset run like an API: owner, documented interface, guarantees, consumers. In dbt: a public, contracted model |
+| Model contract (dbt) | Contrato de modelo | `contract: {enforced: true}`: dbt checks column names/types *before* building (shape, not values) |
+| Constraint (enforced / informational) | Restricción (aplicada / informativa) | PK/FK/not null in DDL. Postgres enforces; BigQuery and Redshift only record them for the optimizer |
+| Access level (dbt) | Nivel de acceso | `private` (own group) · `protected` (own project, default) · `public` (other projects, semantic layer, agents) |
+| Group (dbt) | Grupo | A named owning team for a set of models; `private` models are only ref-able inside it |
+| Model version (dbt) | Versión de modelo | v1 and v2 of a model side by side so a breaking change doesn't break consumers; v1 gets a `deprecation_date` |
+| Deprecation date | Fecha de deprecación | When an old model version stops being supported; dbt warns consumers that still ref it |
+| Data classification | Clasificación de datos | Labels like public / internal / confidential and `pii`, stored as column metadata |
+| PII (Personally Identifiable Information) | Datos personales identificables | Data that identifies a person (email, phone). GDPR: "personal data" |
+| Pseudonymization | Seudonimización | Replacing an identifier with a token (e.g. SHA-256). Joinable but still personal data under GDPR |
+| Masking (static / dynamic) | Enmascaramiento (estático / dinámico) | Hiding values: in SQL when building (static) or by the engine per reader at query time (dynamic) |
+| Least privilege | Mínimo privilegio | Each role gets only the access it needs |
+| Grants (dbt) | Permisos | `grants:` config: dbt applies GRANT/REVOKE after every build, so permissions are versioned with models |
+| Row-level security (RLS) | Seguridad a nivel de fila | The engine filters rows per user/role (PG/Redshift `CREATE POLICY`, BQ row access policies) |
+| Column-level security | Seguridad a nivel de columna | Per-column access control. BigQuery: policy tags + Fine-Grained Reader |
+| Policy tag (BigQuery) | Etiqueta de política | A taxonomy node attached to columns; only Fine-Grained Readers see raw values, Masked Readers see masked ones |
+| Data policy (BigQuery) | Política de datos | A masking rule (SHA256, nullify, default value, …) bound to a policy tag |
+| Authorized view | Vista autorizada | A view allowed to read a dataset its own readers can't access: share a curated slice |
+| Security definer view | Vista con derechos del propietario | A view that runs with its owner's privileges (Postgres default); the PG analogue of an authorized view |
+| Policy as code | Políticas como código | Governance rules written as code and run in CI (here: checks over manifest.json) |
+| manifest.json (dbt) | manifest.json | dbt's compiled project graph with all configs and metadata; the input for CI checks, `--defer`, docs |
+| Exposure (dbt) | Exposición | A declared downstream consumer (dashboard, app) that closes the lineage graph |
+| Data steward / owner | Responsable de datos | The accountable person/team for a dataset's quality, access and definitions |

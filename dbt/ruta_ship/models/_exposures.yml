@@ -1,0 +1,18 @@
+# Downstream consumer of RutaShip's PUBLIC marts: the replication job that copies them into BigQuery
+# (ship_replica, Phase 4). Declaring it makes "which marts leave Postgres?" a query on the graph.
+version: 2
+exposures:
+  - name: udl_replication
+    label: Replication to the BigQuery UDL
+    type: application
+    maturity: medium
+    description: "Copies public marts to BigQuery `ship_replica` (Phase 4/7). Never replicates protected/private models."
+    depends_on:
+      - ref('fct_shipments')
+      - ref('fct_shipment_lifecycle')
+      - ref('dim_shipper')
+      - ref('dim_carrier')
+      - ref('dim_lane')
+    owner:
+      name: Data platform team (UDL)
+      email: data-platform@example.com

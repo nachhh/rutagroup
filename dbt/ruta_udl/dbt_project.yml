@@ -15,16 +15,26 @@ clean-targets: ["target", "dbt_packages"]
 
 models:
   ruta_udl:
+    +group: pay_domain               # ownership (models/_groups.yml); cross-product models override to udl_core
     staging:
       +materialized: view
       +schema: staging
+      +access: private
     intermediate:
       +materialized: view
       +schema: intermediate
+      +access: private
     marts:
       +materialized: table
       +schema: marts
+      +access: protected             # data products opt in to `public` in _marts.yml
+      # Push dbt descriptions to BigQuery column descriptions (and policy tags, when configured).
+      +persist_docs: {relation: true, columns: true}
 
 seeds:
   ruta_udl:
     +schema: seeds
+
+data_tests:
+  ruta_udl:
+    +group: pay_domain

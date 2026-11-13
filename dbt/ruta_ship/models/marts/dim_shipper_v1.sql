@@ -1,4 +1,5 @@
 -- grain: 1 row per shipper VERSION (SCD2), built from the dbt snapshot.
+-- v1 = DEPRECATED (see deprecation_date in _marts.yml): exposes raw contact_email. Consumers migrate to v2.
 -- valid_to uses a far-future sentinel instead of NULL so as-of joins are a simple half-open range:
 --   event_ts >= valid_from and event_ts < valid_to
 {{ config(materialized='table') }}
