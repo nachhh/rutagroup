@@ -1,0 +1,8 @@
+# Ownership as code: every model belongs to exactly one group; `access: private` models can only be
+# ref'd from inside their group. In a real org, `owner` is the team alias that gets paged.
+version: 2
+groups:
+  - name: ship_domain
+    owner:
+      name: RutaShip data team
+      email: ship-data@example.com

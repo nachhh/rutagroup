@@ -1,0 +1,11 @@
+# Ownership as code. pay_domain = RutaPay's models; udl_core = the cross-product (unified) layer.
+version: 2
+groups:
+  - name: pay_domain
+    owner:
+      name: RutaPay data team
+      email: pay-data@example.com
+  - name: udl_core
+    owner:
+      name: Data platform team (UDL)
+      email: data-platform@example.com

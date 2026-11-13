@@ -1,0 +1,31 @@
+# Exposures = declared DOWNSTREAM consumers. They close the lineage graph ("who breaks if I change this?"),
+# show up in `dbt docs`, and can be selected: `dbt build -s +exposure:exec_dashboard` rebuilds exactly what a
+# dashboard needs. Owners here are the CONSUMING teams.
+version: 2
+exposures:
+  - name: exec_dashboard
+    label: Executive revenue dashboard
+    type: dashboard
+    maturity: medium
+    description: "Monthly revenue, collections and plan mix for leadership."
+    depends_on:
+      - ref('fct_invoice_lines')
+      - ref('fct_payments')
+      - ref('dim_date')
+      - ref('rpt_plan_mix_monthly')
+    owner:
+      name: Finance analytics
+      email: finance-analytics@example.com
+
+  - name: metrics_mcp_server
+    label: Metrics MCP server (NL agent)
+    type: application
+    maturity: low
+    description: "Phase 6: exposes governed semantic-layer metrics to an LLM agent over MCP. Only public models."
+    depends_on:
+      - ref('fct_invoice_lines')
+      - ref('fct_payments')
+      - ref('dim_date')
+    owner:
+      name: Data platform team (UDL)
+      email: data-platform@example.com

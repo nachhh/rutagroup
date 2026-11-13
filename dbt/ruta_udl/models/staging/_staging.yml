@@ -3,9 +3,19 @@ version: 2
 models:
   - name: stg_pay__accounts
     description: "Grain: 1 row per RutaPay account. Primary address picked per decision 2A."
+    config:
+      meta: {classification: confidential}
     columns:
       - name: account_id
         data_tests: [unique, not_null]
+      # Classification travels with the column. The source column raw_pay.accounts.billing_contact.email
+      # also carries a BigQuery POLICY TAG (scripts/setup_bq_governance.py), so this view is enforced too.
+      - name: contact_email
+        config: {meta: {pii: true, classification: confidential}, tags: [pii]}
+      - name: contact_phone
+        config: {meta: {pii: true, classification: confidential}, tags: [pii]}
+      - name: contact_name
+        config: {meta: {pii: true, classification: confidential}, tags: [pii]}
   - name: stg_pay__invoices
     description: "Grain: 1 row per invoice header."
     columns:

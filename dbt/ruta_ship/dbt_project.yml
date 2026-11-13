@@ -15,11 +15,28 @@ clean-targets: ["target", "dbt_packages"]
 
 models:
   ruta_ship:
+    +group: ship_domain              # ownership (models/_groups.yml)
     staging:
       +materialized: view
       +schema: staging
+      +access: private               # implementation detail: only this group may ref it
     intermediate:
       +materialized: ephemeral
+      +access: private
     marts:
       +materialized: table
       +schema: marts
+      +access: protected             # default; data products opt in to `public` in _marts.yml
+      # Least privilege as code: dbt runs GRANT after every build (and revokes what's not listed).
+      # Roles are created by scripts/setup_pg_roles.sql (make pg-roles). PII models override this.
+      +grants:
+        select: ['analyst', 'pii_reader']
+
+# Grants on tables are useless without USAGE on the schema. dbt doesn't manage schema grants → a hook does.
+on-run-end:
+  - "{% for s in schemas %}grant usage on schema {{ s }} to analyst, pii_reader, pii_reader_iberia;{% endfor %}"
+
+# Singular tests ref private staging models → they must belong to the owning group too.
+data_tests:
+  ruta_ship:
+    +group: ship_domain

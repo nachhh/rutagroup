@@ -2,6 +2,9 @@
 
 Materializations: 🟦 view · ⬜ ephemeral · 🟩 table · 🟧 incremental · 🟪 snapshot · 🟥 materialized view
 
+Access (Phase 3): staging/intermediate are `private`; public data products are `fct_shipments`, `fct_shipment_lifecycle`,
+`dim_shipper` v2, `dim_carrier`, `dim_lane` (ship) and `fct_invoice_lines`, `fct_payments`, `dim_date` (udl). Everything else is `protected`.
+
 ## ruta_ship (Postgres ≈ Redshift)
 
 ```mermaid
@@ -14,7 +17,10 @@ flowchart LR
   classDef mv fill:#fee2e2,stroke:#dc2626,color:#111
 
   src_shippers[(raw_ship.shippers)] --> stg_shippers[stg_ship__shippers]:::view
-  src_shippers --> snap[snap_shippers<br/>timestamp strategy]:::snap --> dim_shipper[dim_shipper<br/>SCD2]:::table
+  src_shippers --> snap[snap_shippers<br/>timestamp strategy]:::snap
+  snap --> dim_v1[dim_shipper v1<br/>raw email · protected · deprecated]:::table
+  snap --> dim_v2[dim_shipper v2<br/>email_sha256 · PUBLIC]:::table
+  stg_shippers --> contacts[dim_shipper_contacts<br/>PII · pii_reader · RLS]:::table --> masked[v_shipper_contacts_masked<br/>analyst]:::view
   src_shipments[(raw_ship.shipments)] --> stg_shipments[stg_ship__shipments]:::view
   src_events[(raw_ship.shipment_events)] --> stg_events[stg_ship__shipment_events]:::view
   src_carriers[(raw_ship.carriers)] --> stg_carriers[stg_ship__carriers]:::view --> dim_carrier[dim_carrier]:::table

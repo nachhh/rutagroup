@@ -1,29 +1,58 @@
 version: 2
 
+# Governance legend (read by scripts/check_governance.py from manifest.json):
+#   access: public            → a DATA PRODUCT. Must have: group (owner), enforced contract, PK test, no raw PII.
+#   contract.enforced         → dbt checks column names + types BEFORE building (shape, not values).
+#   constraints               → written into the DDL. Postgres ENFORCES them; Redshift/BigQuery do NOT (informational).
+#   meta.pii / classification → machine-readable labels: public | internal | confidential.
+
 models:
   - name: fct_shipments
     description: "Grain: 1 row per shipment (current status). Incremental merge on shipment_id."
+    config:
+      access: public
+      contract: {enforced: true}
+      meta: {classification: internal}
     columns:
       - name: shipment_id
+        data_type: bigint
+        constraints: [{type: primary_key}]     # enforced in PG; replaces the old unique index
         data_tests: [unique, not_null]
       - name: shipper_id
+        data_type: integer
         data_tests:
           - relationships:
               arguments:
-                to: ref('dim_shipper')
+                to: ref('dim_shipper')         # resolves to latest_version (v2)
                 field: shipper_id
+      - {name: carrier_id, data_type: integer}
+      - {name: lane_id, data_type: integer}
+      - {name: status, data_type: varchar}
       - name: gmv_amount
+        data_type: "numeric(14,2)"
         data_tests:
           - dbt_utils.expression_is_true:
               arguments:
                 expression: ">= 0"
       - name: booking_fee
+        data_type: "numeric(14,2)"
         data_tests:
           - dbt_utils.expression_is_true:
               arguments:
                 expression: "<= gmv_amount"
+      - {name: currency, data_type: "char(3)"}
+      - {name: booked_at, data_type: timestamp}
+      - {name: booked_date, data_type: date}
+      - {name: promised_delivery_at, data_type: timestamp}
+      - {name: delivered_at, data_type: timestamp}
+      - {name: delivered_date, data_type: date}
+      - {name: had_exception, data_type: boolean}
+      - {name: is_on_time, data_type: boolean}
+      - {name: updated_at, data_type: timestamp}
+      - {name: _dbt_loaded_at, data_type: timestamptz}
+
   - name: fct_shipment_events
-    description: "Grain: 1 row per tracking event. Incremental append."
+    description: "Grain: 1 row per tracking event. Incremental append. Protected: high-volume, internal."
     columns:
       - name: event_id
         data_tests: [unique, not_null]
@@ -32,26 +61,130 @@ models:
           - accepted_values:
               arguments:
                 values: [booked, picked_up, in_transit, delivered, exception, cancelled]
+
   - name: fct_shipment_lifecycle
     description: "Grain: 1 row per shipment. Accumulating snapshot of milestones."
+    config:
+      access: public
+      contract: {enforced: true}
+      meta: {classification: internal}
     columns:
       - name: shipment_id
+        data_type: bigint
+        constraints: [{type: primary_key}]
         data_tests: [unique, not_null]
+      - {name: shipper_id, data_type: integer}
+      - {name: carrier_id, data_type: integer}
+      - {name: booked_at, data_type: timestamp}
+      - {name: picked_up_at, data_type: timestamp}
+      - {name: delivered_at, data_type: timestamp}
+      - {name: cancelled_at, data_type: timestamp}
+      - {name: promised_delivery_at, data_type: timestamp}
+      - {name: current_milestone, data_type: text}
+      - {name: hours_to_pickup, data_type: "numeric(10,2)"}
+      - {name: hours_in_transit, data_type: "numeric(10,2)"}
+      - {name: hours_late, data_type: "numeric(10,2)"}
+
+  # ---- Versioned data product: a breaking change shipped without breaking consumers ----
+  # ref('dim_shipper') → latest_version (v2). Pinned consumers use ref('dim_shipper', v=1) until deprecation_date.
+  # Relations: ship_marts.dim_shipper_v1, ship_marts.dim_shipper_v2.
   - name: dim_shipper
     description: "Grain: 1 row per shipper version (SCD2 from snap_shippers)."
+    latest_version: 2
+    config:
+      access: public
+      contract: {enforced: true}
+      meta: {classification: internal}
     data_tests:
-      # exactly one current version per shipper
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [shipper_id, valid_from]
     columns:
       - name: shipper_sk
+        data_type: text
+        constraints: [{type: primary_key}]
         data_tests: [unique, not_null]
+      - {name: shipper_id, data_type: integer}
+      - {name: company_name, data_type: varchar}
+      - {name: tax_id_normalized, data_type: text}
+      - name: email_sha256
+        data_type: text
+        description: "SHA-256 of the lower-cased contact email. Pseudonymized (still personal data), joinable across systems."
+        config: {meta: {pii: false, classification: internal, pseudonymized: true}}
+      - {name: email_domain, data_type: text}
+      - {name: country, data_type: "char(2)"}
+      - {name: region, data_type: varchar}
+      - {name: tier, data_type: varchar}
+      - {name: created_at, data_type: timestamp}
+      - {name: valid_from, data_type: timestamp}
+      - {name: valid_to, data_type: timestamp}
+      - {name: is_current, data_type: boolean}
+    versions:
+      - v: 2
+      - v: 1
+        config: {access: protected}            # no new consumers outside the project
+        deprecation_date: 2026-12-31           # dbt warns every consumer that still refs v1
+        columns:
+          - include: all
+            exclude: [email_sha256]
+          - name: contact_email
+            data_type: text
+            config: {meta: {pii: true, classification: confidential}, tags: [pii]}
+
+  - name: dim_shipper_contacts
+    description: "Grain: 1 row per shipper, current contact (SCD1). Raw PII: pii_reader roles only, RLS by region."
+    config:
+      meta: {classification: confidential}
+    columns:
+      - name: shipper_id
+        data_tests: [unique, not_null]
+      - name: contact_email
+        config: {meta: {pii: true, classification: confidential}, tags: [pii]}
+      - name: contact_phone
+        config: {meta: {pii: true, classification: confidential}, tags: [pii]}
+
+  - name: v_shipper_contacts_masked
+    description: "Grain: 1 row per shipper. Statically masked emails for analysts (owner-rights view)."
+    config:
+      meta: {classification: internal}
+    columns:
+      - name: shipper_id
+        data_tests: [unique, not_null]
+      - name: contact_email_masked
+        config: {meta: {pii: false, masked: true}}
+
   - name: dim_carrier
+    description: "Grain: 1 row per carrier."
+    config:
+      access: public
+      contract: {enforced: true}
+      meta: {classification: public}
     columns:
       - name: carrier_id
+        data_type: integer
+        constraints: [{type: primary_key}]
         data_tests: [unique, not_null]
+      - {name: carrier_name, data_type: varchar}
+      - {name: mode, data_type: varchar}
+
   - name: dim_lane
+    description: "Grain: 1 row per lane (origin region → destination region)."
+    config:
+      access: public
+      contract: {enforced: true}
+      meta: {classification: public}
     columns:
       - name: lane_id
+        data_type: integer
+        constraints: [{type: primary_key}]
         data_tests: [unique, not_null]
+      - {name: origin_region, data_type: varchar}
+      - {name: dest_region, data_type: varchar}
+      - {name: distance_km, data_type: integer}
+
+  - name: mv_daily_lane_volume
+    description: "Grain: 1 row per origin region × destination region × day. Protected: internal ops view."
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [booked_date, origin_region, dest_region]

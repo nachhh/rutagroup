@@ -45,17 +45,22 @@ make up          # docker compose up -d --wait
 make data        # synthetic data → ./data (deterministic, seed 42)
 make load        # RutaShip CSV → Postgres raw_ship ; RutaPay JSONL → BigQuery raw_pay
 make debug       # dbt debug in both projects
+make pg-roles    # least-privilege roles in Postgres (needed before the first `make ship`)
 
 # 5. Build
 make ship        # dbt build: ruta_ship on Postgres
 make udl         # dbt build: ruta_udl on BigQuery
+
+# 6. Governance (Phase 3)
+make govern         # policy checks over both manifest.json files (CI gate)
+make bq-governance  # BQ policy tag + dynamic masking + authorized view (re-run after `make load-bq`)
+make day2           # optional: simulate day-2 source changes, then `make snapshot ship`
 ```
 
 Coming in later phases (targets are added as each phase lands):
 
 ```bash
 make replicate   # Phase 4: RutaShip marts → BigQuery ship_replica (simulated UNLOAD → S3 → GCS → BQ)
-make govern      # Phase 3: governance policy checks over manifest.json
 make mf Q="..."  # Phase 5: MetricFlow queries, e.g. --metrics total_revenue --group-by customer__region
 make ask Q="..." # Phase 6: natural-language question → MCP → semantic layer
 make all         # whole pipeline end-to-end (same steps as the Airflow DAG, Phase 7)
@@ -160,7 +165,7 @@ Total ≈ 7.75 h. That is the top of the budget. If we run behind, cut in this o
 - [x] Phase 0: Setup
 - [x] Phase 1: Data modeling
 - [x] Phase 2: dbt refresher
-- [ ] Phase 3: Governance → code
+- [x] Phase 3: Governance → code
 - [ ] Phase 4: UDL / ontology / KG
 - [ ] Phase 5: Semantic Layer / MetricFlow
 - [ ] Phase 6: NL + MCP agent
