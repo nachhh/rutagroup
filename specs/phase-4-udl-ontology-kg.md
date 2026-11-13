@@ -50,5 +50,7 @@ Update `docs/diagrams/ontology.md` (final) and add `docs/diagrams/entity-resolut
 1. Matching rules and confidence threshold for auto-merge
 2. Ambiguous matches: drop, keep separate, or review queue?
 3. Revenue currency normalization: where and when (FX at transaction date vs month-end)?
+4. As-of join grain for billing (Phase 2 finding: 20 invoices issued hours before the subscription start on the same day):
+   join at date grain, or normalize `valid_from` to the start of the day?
 
-## 🧠 Quiz 4: 6 questions
+## 🧠 Quiz 4: 4 questions

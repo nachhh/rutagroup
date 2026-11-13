@@ -1,0 +1,26 @@
+unit_tests:
+  - name: test_primary_address_and_tax_id
+    description: >
+      Decision 2A: is_primary wins regardless of array position; without one, the first billing address wins.
+      Also checks the VAT-prefixed tax_id normalization. Nested inputs (ARRAY<STRUCT>) need `format: sql`; expected output uses scalar columns only.
+    model: stg_pay__accounts
+    given:
+      - input: source('raw_pay', 'accounts')
+        format: sql
+        rows: |
+          select 'a1' as account_id, 'ACME' as legal_name, 'ES B12345678' as tax_id,
+                 struct('Ana' as name, 'Ana@Acme.es' as email, '1' as phone) as billing_contact,
+                 [struct('shipping' as type, 'MX' as country, 'mexico' as region, 'CDMX' as city, 'x' as line1, false as is_primary),
+                  struct('billing',  'ES', 'iberia', 'Madrid', 'y', true)] as addresses,
+                 ['priority'] as tags, timestamp '2026-01-01' as created_at
+          union all
+          select 'a2', 'BETA', 'MXC87654321',
+                 struct('Bo' as name, 'bo@gmail.com' as email, '2' as phone),
+                 [struct('shipping' as type, 'CL' as country, 'southern_cone' as region, 'Santiago' as city, 'z' as line1, false as is_primary),
+                  struct('billing',  'CO', 'andean', 'Bogotá', 'w', false)],
+                 cast([] as array<string>), timestamp '2026-01-01'
+    expect:
+      # dict format: only the listed (scalar) columns are compared
+      rows:
+        - {account_id: a1, tax_id_normalized: B12345678, primary_country: ES, primary_region: iberia, primary_city: Madrid, is_priority: true}
+        - {account_id: a2, tax_id_normalized: C87654321, primary_country: CO, primary_region: andean, primary_city: "Bogotá", is_priority: false}

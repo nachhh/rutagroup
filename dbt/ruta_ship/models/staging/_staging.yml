@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: stg_ship__shippers
+    description: "Grain: 1 row per shipper. tax_id normalized via the cross-db macro."
+    columns:
+      - name: shipper_id
+        data_tests: [unique, not_null]
+      - name: tier
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [basic, pro, enterprise]
+      - name: region
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [iberia, mexico, andean, southern_cone]
+  - name: stg_ship__shipments
+    description: "Grain: 1 row per shipment."
+    columns:
+      - name: shipment_id
+        data_tests: [unique, not_null]
+      - name: shipper_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_ship__shippers')
+                field: shipper_id
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [delivered, in_transit, cancelled, exception]
+  - name: stg_ship__shipment_events
+    description: "Grain: 1 row per tracking event."
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]

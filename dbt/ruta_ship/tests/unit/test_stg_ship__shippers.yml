@@ -1,0 +1,18 @@
+# UNIT TEST (dbt ≥ 1.8): mocked input rows → expected output rows. Tests the LOGIC (tax_id normalization,
+# email domain) without real data, so it can run first in CI. Columns not listed are filled with nulls.
+unit_tests:
+  - name: test_tax_id_and_email_domain_normalization
+    model: stg_ship__shippers
+    given:
+      - input: source('raw_ship', 'shippers')
+        rows:
+          - {shipper_id: 1, tax_id: "B-1234567-8", contact_email: " Ana.Gil@Acme.ES "}
+          - {shipper_id: 2, tax_id: "b12345678",   contact_email: "x@gmail.com"}
+          - {shipper_id: 3, tax_id: "B 12345678",  contact_email: "y@acme.es"}
+          - {shipper_id: 4, tax_id: null,          contact_email: "z@acme.es"}
+    expect:
+      rows:
+        - {shipper_id: 1, tax_id_normalized: "B12345678", email_domain: "acme.es"}
+        - {shipper_id: 2, tax_id_normalized: "B12345678", email_domain: "gmail.com"}
+        - {shipper_id: 3, tax_id_normalized: "B12345678", email_domain: "acme.es"}
+        - {shipper_id: 4, tax_id_normalized: null,        email_domain: "acme.es"}

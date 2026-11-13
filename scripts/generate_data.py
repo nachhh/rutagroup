@@ -102,6 +102,8 @@ class Company:
     churn_pay: date | None = None
     shipper_id: int | None = None
     account_id: str | None = None
+    pay_legal_name: str | None = None
+    pay_tax_id: str | None = None
     contact_first: str = field(default_factory=fake.first_name)
     contact_last: str = field(default_factory=fake.last_name)
 
@@ -327,7 +329,9 @@ def build_pay(companies: list[Company], shipments: list[dict]):
         invoices.append({
             "invoice_id": inv_id, "account_id": c.account_id, "invoice_number": f"RP-{inv_no}",
             "currency": c.currency, "status": status, "issued_at": iso(issued), "due_date": iso(due),
-            "subtotal": round(subtotal, 2), "total": total, "lines": lines, "metadata": metadata,
+            "subtotal": round(subtotal, 2), "total": total,
+            "bill_to": {"legal_name": c.pay_legal_name, "tax_id": c.pay_tax_id},   # as printed on the document
+            "lines": lines, "metadata": metadata,
         })
         method = rng.choices([{"type": "card", "brand": rng.choice(["visa", "mastercard", "amex"])},
                               {"type": "transfer"}, {"type": "sepa_debit"}], [5, 3, 2])[0]
@@ -358,8 +362,9 @@ def build_pay(companies: list[Company], shipments: list[dict]):
             addresses.append({"type": "shipping", "country": ct, "region": COUNTRIES[ct][0],
                               "city": rng.choice(COUNTRIES[ct][3]), "line1": fake.street_address(), "is_primary": False})
         rng.shuffle(addresses)  # primary address is not always first → ARRAY_AGG/ORDER BY lesson
+        c.pay_legal_name, c.pay_tax_id = pay_name(c), pay_tax_id(c)
         accounts.append({
-            "account_id": c.account_id, "legal_name": pay_name(c), "tax_id": pay_tax_id(c),
+            "account_id": c.account_id, "legal_name": c.pay_legal_name, "tax_id": c.pay_tax_id,
             "billing_contact": {"name": f"{c.contact_first} {c.contact_last}", "email": email(c, 0.15),
                                 "phone": fake.phone_number()},
             "addresses": addresses,

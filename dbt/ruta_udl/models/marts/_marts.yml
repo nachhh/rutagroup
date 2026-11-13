@@ -1,0 +1,39 @@
+version: 2
+
+models:
+  - name: dim_date
+    columns:
+      - name: date_day
+        data_tests: [unique, not_null]
+  - name: fct_invoice_lines
+    description: "Grain: 1 row per invoice line. Incremental insert_overwrite on issued_date partitions (7-day lookback)."
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [invoice_id, line_no]
+    columns:
+      - name: plan_code
+        description: "Plan at issue time (as-of SCD2 join). Null only for accounts without an active subscription."
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+                where: "revenue_type in ('subscription', 'txn_fee')"
+  - name: fct_payments
+    description: "Grain: 1 row per invoice with payment activity. Incremental merge on invoice_id."
+    columns:
+      - name: invoice_id
+        data_tests: [unique, not_null]
+      - name: amount_refunded
+        data_tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "<= coalesce(amount_paid, 0)"
+  - name: rpt_plan_mix_monthly
+    columns:
+      - name: month
+        data_tests: [unique, not_null]
+  - name: exp_account_invoices_nested
+    columns:
+      - name: account_id
+        data_tests: [unique, not_null]

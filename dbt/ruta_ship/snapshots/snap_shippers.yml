@@ -1,0 +1,12 @@
+snapshots:
+  - name: snap_shippers
+    description: >
+      SCD2 history of RutaShip shippers (tier/region changes). Polling-based: captures only the
+      states present at each `dbt snapshot` run; two changes between runs → the middle one is lost.
+    relation: source('raw_ship', 'shippers')
+    config:
+      schema: snapshots
+      unique_key: shipper_id
+      strategy: timestamp          # trust the source's updated_at (alt: strategy: check + check_cols)
+      updated_at: updated_at
+      hard_deletes: invalidate     # source row deleted → close its current version

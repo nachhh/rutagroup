@@ -24,3 +24,7 @@ models:
     marts:
       +materialized: table
       +schema: marts
+
+seeds:
+  ruta_udl:
+    +schema: seeds

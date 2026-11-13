@@ -1,0 +1,23 @@
+version: 2
+
+sources:
+  - name: raw_pay
+    description: RutaPay raw tables (native BigQuery, nested + JSON), loaded by scripts/load_bigquery.py.
+    schema: raw_pay
+    config:
+      freshness:
+        warn_after: {count: 2, period: day}
+        error_after: {count: 30, period: day}
+    tables:
+      - name: accounts
+        # No loaded_at_field: BigQuery supports METADATA-based freshness (table last-modified time),
+        # unlike Postgres. It answers "when was this table last loaded?", not "how recent is the data?".
+      - name: invoices
+        config:
+          loaded_at_field: issued_at
+      - name: payment_events
+        config:
+          loaded_at_field: received_at
+      - name: subscription_changes
+        config:
+          loaded_at_field: changed_at

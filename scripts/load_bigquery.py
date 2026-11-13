@@ -53,6 +53,7 @@ SCHEMAS = {
         F("due_date", "DATE"),
         F("subtotal", "NUMERIC"),
         F("total", "NUMERIC"),
+        F("bill_to", "RECORD", fields=[F("legal_name", "STRING"), F("tax_id", "STRING")]),  # document-of-record copy
         F("lines", "RECORD", "REPEATED", fields=[
             F("line_no", "INT64"), F("sku", "STRING"), F("description", "STRING"),
             F("qty", "NUMERIC"), F("unit_amount", "NUMERIC"), F("tax_rate", "NUMERIC"),

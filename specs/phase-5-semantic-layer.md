@@ -55,4 +55,4 @@ mf query ... --explain        # read the generated SQL: entity join paths, fan-o
 1. Where the "revenue" definition lives (fact vs metric layer), and the currency handling
 2. Churn definition (no activity in either product for N days? subscription cancel?)
 
-## 🧠 Quiz 5: 8 questions
+## 🧠 Quiz 5: 4 questions
