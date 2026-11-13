@@ -1,0 +1,17 @@
+unit_tests:
+  - name: test_scd2_validity_windows_from_change_log
+    description: >
+      start → upgrade → cancel produces 3 contiguous versions: each valid_to equals the next valid_from,
+      the cancel version has no plan, and only the last one is current.
+    model: int_subscriptions_scd2
+    given:
+      - input: ref('stg_pay__subscription_changes')
+        rows:
+          - {account_id: a1, plan_code: starter, change_type: start,   changed_at: "2026-01-01 00:00:00"}
+          - {account_id: a1, plan_code: growth,  change_type: upgrade, changed_at: "2026-03-15 00:00:00"}
+          - {account_id: a1, plan_code: growth,  change_type: cancel,  changed_at: "2026-06-01 00:00:00"}
+    expect:
+      rows:
+        - {account_id: a1, plan_code: starter, subscription_status: active,    valid_from: "2026-01-01 00:00:00", valid_to: "2026-03-15 00:00:00", is_current: false}
+        - {account_id: a1, plan_code: growth,  subscription_status: active,    valid_from: "2026-03-15 00:00:00", valid_to: "2026-06-01 00:00:00", is_current: false}
+        - {account_id: a1, plan_code: null,    subscription_status: cancelled, valid_from: "2026-06-01 00:00:00", valid_to: "9999-12-31 00:00:00", is_current: true}

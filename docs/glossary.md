@@ -45,3 +45,26 @@ Grows phase by phase. Format: **English** · *Español*: one-line definition.
 | BRIN index (Postgres) | Índice BRIN | Tiny block-range index, ideal for naturally ordered columns like timestamps |
 | Zone maps (Redshift) | Mapas de zona | Per-block min/max metadata that lets Redshift skip blocks; driven by the SORTKEY |
 | Hot / cold data | Datos calientes / fríos | Rows that still change (open processes) vs. frozen rows (closed) |
+| Materialization (dbt) | Materialización | How dbt persists a model: view, table, incremental, ephemeral, materialized_view |
+| Ephemeral model | Modelo efímero | Not created in the DB; inlined as a CTE into downstream models |
+| Incremental model | Modelo incremental | Processes only new/changed rows after the first build |
+| Watermark | Marca de agua | The max value (timestamp/id) already loaded; the next run reads above it |
+| Lookback window | Ventana de reprocesamiento | Re-read rows N days behind the watermark to catch late arrivals |
+| Late-arriving data | Datos que llegan tarde | Rows that land after newer rows were already processed |
+| Idempotent | Idempotente | Running it twice gives the same result (merge on a key is; append is not) |
+| delete+insert | Borrar e insertar | Incremental strategy: delete matching keys, then insert (classic on Redshift) |
+| Microbatch (dbt) | Microlotes | Incremental strategy that processes time batches with built-in backfills/retries |
+| Snapshot (dbt) | Snapshot / instantánea | Polling-based SCD2 capture of a mutable source table |
+| Change log | Registro de cambios | App-written table with one row per business change (log-based history) |
+| CDC (Change Data Capture) | Captura de cambios de datos | Streaming row changes from a DB transaction log (Debezium, DMS, Datastream) |
+| Data test (generic / singular) | Test de datos (genérico / singular) | Query that returns failing rows; YAML-declared reusable vs one-off SQL file |
+| Unit test (dbt) | Test unitario | Mocked inputs → expected outputs to test model logic without real data |
+| Source freshness | Frescura de fuentes | SLA check on how recent a source's data is (loaded_at_field or table metadata) |
+| store_failures | Guardar fallos | Persist a test's failing rows in a table for debugging |
+| Reconciliation test | Test de conciliación | Compares source vs target to detect rows an incremental missed |
+| adapter.dispatch | adapter.dispatch | dbt mechanism to pick a macro implementation per database |
+| UNNEST | UNNEST / desanidar | Turns an ARRAY into rows (BigQuery) |
+| QUALIFY | QUALIFY | Filters on a window function result without a subquery |
+| HyperLogLog++ (APPROX_COUNT_DISTINCT) | HyperLogLog++ | Approximate distinct count: tiny memory, ~1% error |
+| Document of record | Documento fehaciente | The legally issued artifact (invoice) whose values must be kept as issued |
+| On-demand minimum billing (BQ) | Facturación mínima on-demand | BigQuery bills at least 10 MB per table referenced in a query |

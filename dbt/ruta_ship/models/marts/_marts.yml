@@ -1,0 +1,57 @@
+version: 2
+
+models:
+  - name: fct_shipments
+    description: "Grain: 1 row per shipment (current status). Incremental merge on shipment_id."
+    columns:
+      - name: shipment_id
+        data_tests: [unique, not_null]
+      - name: shipper_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_shipper')
+                field: shipper_id
+      - name: gmv_amount
+        data_tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: ">= 0"
+      - name: booking_fee
+        data_tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "<= gmv_amount"
+  - name: fct_shipment_events
+    description: "Grain: 1 row per tracking event. Incremental append."
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: event_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [booked, picked_up, in_transit, delivered, exception, cancelled]
+  - name: fct_shipment_lifecycle
+    description: "Grain: 1 row per shipment. Accumulating snapshot of milestones."
+    columns:
+      - name: shipment_id
+        data_tests: [unique, not_null]
+  - name: dim_shipper
+    description: "Grain: 1 row per shipper version (SCD2 from snap_shippers)."
+    data_tests:
+      # exactly one current version per shipper
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [shipper_id, valid_from]
+    columns:
+      - name: shipper_sk
+        data_tests: [unique, not_null]
+  - name: dim_carrier
+    columns:
+      - name: carrier_id
+        data_tests: [unique, not_null]
+  - name: dim_lane
+    columns:
+      - name: lane_id
+        data_tests: [unique, not_null]

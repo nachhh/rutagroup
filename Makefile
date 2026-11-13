@@ -5,7 +5,7 @@ export
 export DBT_PROFILES_DIR := $(CURDIR)
 DBT := uv run dbt
 
-.PHONY: help up down data load load-pg load-bq deps ship udl debug clean
+.PHONY: help up down data load load-pg load-bq deps ship udl debug clean day2 snapshot freshness
 
 help:            ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -32,6 +32,13 @@ debug:           ## dbt debug in both projects
 
 ship:            ## dbt build RutaShip (Postgres)
 	cd dbt/ruta_ship && $(DBT) build
+snapshot:        ## dbt snapshot RutaShip (SCD2 capture)
+	cd dbt/ruta_ship && $(DBT) snapshot
+freshness:       ## source freshness checks, both projects
+	cd dbt/ruta_ship && $(DBT) source freshness || true
+	cd dbt/ruta_udl && $(DBT) source freshness || true
+day2:            ## simulate day-2 changes in RutaShip source (incrementals, snapshot, late data)
+	uv run python scripts/day2_ship.py
 udl:             ## dbt build UDL (BigQuery)
 	cd dbt/ruta_udl && $(DBT) build
 

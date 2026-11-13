@@ -1,0 +1,12 @@
+version: 2
+seeds:
+  - name: seed_region_map
+    description: "Conformed country → region rule (Quiz 1 Q4). One owner, one definition, used by both products."
+    columns:
+      - name: country_code
+        data_tests: [unique, not_null]
+  - name: seed_plans
+    description: RutaPay price list (EUR / month).
+    columns:
+      - name: plan_code
+        data_tests: [unique, not_null]

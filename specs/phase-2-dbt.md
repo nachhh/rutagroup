@@ -55,10 +55,29 @@ written cross-database with `adapter.dispatch`), `dbt build` vs `run` + `test`, 
 - At least: 1 incremental merge (PG), 1 append/microbatch (PG), 1 insert_overwrite (BQ), 1 snapshot (PG), 1 log-derived SCD2 (BQ), 1 unit test, 1 singular test
 - Every BQ feature in the table above appears in at least one model
 
-## 🧭 Checkpoints
+## Status log
+- ✅ `ruta_ship` (PG): 44/44 on first build. `make day2` → snapshot +75 versions, events APPEND +1,291, shipments MERGE 1,360.
+  The reconciliation test WARNed on the correction 5 days late (shipment 2), as designed. `--full-refresh -s fct_shipments+` fixed it.
+- ✅ `ruta_udl` (BQ): 43 pass + 1 WARN. Second run: `insert_overwrite` processed 164.5 KiB (7 partitions), `fct_payments` MERGE touched 2 invoices.
+  BQ on-demand bills a **10 MB minimum per table referenced**, which dominates at this scale.
+- Unit test lesson: BQ can't compare ARRAY columns in EXCEPT (used by dbt unit tests) → flatten STRUCTs in staging, use `format: sql` for nested *inputs* only.
+- ⚠️ Finding: 20 fee lines have no as-of plan. They were issued hours *before* the subscription start timestamp on the same day
+  (billing compares dates; our join compares timestamps). Kept as `warn`; the fix is a Phase 4 checkpoint.
+- Generator: invoices now carry `bill_to {legal_name, tax_id}` (document of record). RNG sequence unchanged.
+- ✅ Quiz 2 done (4 questions). Follow-ups for Phase 7: Slim CI (`state:modified+ --defer`), `dbt clone`.
+
+## 🧭 Decisions (settled)
+1. `fct_shipments`: **merge** on `shipment_id`, 3-day lookback on `updated_at`. The lookback = worst expected *ingestion*
+   delay (not shipment duration). The best practice is filtering on a load timestamp; mitigations are a periodic full refresh and reconciliation tests.
+   `scripts/day2_ship.py` simulates a late arrival 2 days behind (caught) and one 5 days behind (missed).
+2. Primary address: `is_primary` → first billing → any (`ARRAY_AGG ... ORDER BY ... LIMIT 1`).
+3. `fct_invoice_lines`: `insert_overwrite` rebuilding the last **7 days** of partitions + a monthly full refresh.
+4. Invoice total vs lines: singular test, €0.01 tolerance, `warn_if: ">0"`, `error_if: ">10"`.
+
+## 🧭 Checkpoints (original)
 1. Incremental strategy and lookback for `fct_shipments` (merge vs delete+insert)
 2. Primary address rule for multi-address accounts
 3. `insert_overwrite` lookback (how many partitions to rebuild) for `fct_invoice_lines`
 4. Is a mismatch in invoice total vs sum of lines `warn` or `error`?
 
-## 🧠 Quiz 2: 8 questions (materializations, incremental strategies, snapshots vs log SCD2, unit vs data tests, UNNEST semantics, QUALIFY, partition vs cluster, `--defer`)
+## 🧠 Quiz 2: 4 questions (incremental strategies + idempotency, UNNEST semantics, snapshots vs log SCD2, partition vs cluster + `--defer`)

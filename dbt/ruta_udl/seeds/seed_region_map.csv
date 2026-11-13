@@ -1,0 +1,7 @@
+country_code,country_name,region,currency
+ES,Spain,iberia,EUR
+PT,Portugal,iberia,EUR
+MX,Mexico,mexico,MXN
+CO,Colombia,andean,COP
+CL,Chile,southern_cone,CLP
+AR,Argentina,southern_cone,USD

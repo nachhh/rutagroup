@@ -29,4 +29,4 @@ Deliverable: `docs/03_governance.md`, centered on a **concept → artifact** tab
 ## 🧭 Checkpoint
 Which models are `public`? This defines the UDL's "data product" surface.
 
-## 🧠 Quiz 3: 5 questions (contract vs test, access levels, versions, policy tags vs authorized views, what "governance as code" buys you)
+## 🧠 Quiz 3: 4 questions (contract vs test, access levels + versions, policy tags vs authorized views, what "governance as code" buys you)

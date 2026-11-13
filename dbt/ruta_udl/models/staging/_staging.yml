@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: stg_pay__accounts
+    description: "Grain: 1 row per RutaPay account. Primary address picked per decision 2A."
+    columns:
+      - name: account_id
+        data_tests: [unique, not_null]
+  - name: stg_pay__invoices
+    description: "Grain: 1 row per invoice header."
+    columns:
+      - name: invoice_id
+        data_tests: [unique, not_null]
+      - name: account_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_pay__accounts')
+                field: account_id
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [paid, open, void, uncollectible]
+  - name: stg_pay__invoice_lines
+    description: "Grain: 1 row per invoice line (UNNEST of invoices.lines)."
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [invoice_id, line_no]
+    columns:
+      - name: revenue_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [subscription, txn_fee, freight_fee, pass_through]
+  - name: stg_pay__payment_events
+    description: "Grain: 1 row per distinct webhook event (deduplicated with QUALIFY)."
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: event_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [payment.succeeded, payment.failed]

@@ -14,9 +14,10 @@ specs are in [specs/](specs/).
    layers, ontologies/KGs, dbt SL/MetricFlow, NL querying, BQ+Redshift, governance). Do this even if
    the terms are also in `docs/glossary.md`.
 3. **Decision checkpoints (🧭).** Stop and ask the user. Don't decide silently.
-4. **Quizzes (🧠).** Ask in chat one question at a time. The user answers before seeing the solution.
-   Once a quiz is settled, write it (questions, user's answers, feedback) to
-   `quizzes/quiz-<n>-<title>.md`. `quizzes/` is gitignored.
+4. **Quizzes (🧠).** At most **4 questions** per phase quiz (extra review rounds come after all phases, time permitting). Ask in chat one question at a time. The user answers before seeing the solution.
+   Once a quiz is settled, write it to `quizzes/quiz-<n>-<title>.md` (gitignored): for each question,
+   the question, the user's answer, and the **complete correct answer as detailed as in the session**
+   (SQL/YAML snippets, tables, interview phrasing), plus a score line and the observed pattern.
 5. **Git: always ask first** before any commit, branch, merge, push, or tag.
    - From Phase 1 on, each phase gets its own branch off `main`: `phase-<n>-<short-description>`
      (e.g. `phase-1-data-modeling`). Phase 0 went straight to `main`.

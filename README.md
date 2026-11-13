@@ -159,7 +159,7 @@ Total ≈ 7.75 h. That is the top of the budget. If we run behind, cut in this o
 
 - [x] Phase 0: Setup
 - [x] Phase 1: Data modeling
-- [ ] Phase 2: dbt refresher
+- [x] Phase 2: dbt refresher
 - [ ] Phase 3: Governance → code
 - [ ] Phase 4: UDL / ontology / KG
 - [ ] Phase 5: Semantic Layer / MetricFlow
