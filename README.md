@@ -55,12 +55,16 @@ make udl         # dbt build: ruta_udl on BigQuery
 make govern         # policy checks over both manifest.json files (CI gate)
 make bq-governance  # BQ policy tag + dynamic masking + authorized view (re-run after `make load-bq`)
 make day2           # optional: simulate day-2 source changes, then `make snapshot ship`
+
+# 7. UDL, entity resolution, ontology + knowledge graph (Phase 4)
+make replicate      # RutaShip public marts → BigQuery ship_replica (then `make udl`)
+make ontology       # regenerate kg_nodes / kg_edges dbt models from ontology/ruta_ontology.yml
+make eval-er        # entity-resolution precision / recall vs the generator's ground truth
 ```
 
 Coming in later phases (targets are added as each phase lands):
 
 ```bash
-make replicate   # Phase 4: RutaShip marts → BigQuery ship_replica (simulated UNLOAD → S3 → GCS → BQ)
 make mf Q="..."  # Phase 5: MetricFlow queries, e.g. --metrics total_revenue --group-by customer__region
 make ask Q="..." # Phase 6: natural-language question → MCP → semantic layer
 make all         # whole pipeline end-to-end (same steps as the Airflow DAG, Phase 7)
@@ -124,7 +128,9 @@ Full Mermaid diagrams are in [docs/diagrams/](docs/diagrams/):
 [architecture](docs/diagrams/architecture.md) ·
 [source ERD](docs/diagrams/source-erd.md) ·
 [pipeline flow](docs/diagrams/pipeline-flow.md) ·
-[ontology (draft)](docs/diagrams/ontology.md) ·
+[ontology](docs/diagrams/ontology.md) ·
+[entity resolution](docs/diagrams/entity-resolution.md) ·
+[dbt lineage](docs/diagrams/dbt-lineage.md) ·
 [NL agent sequence](docs/diagrams/nl-agent-sequence.md)
 
 **Why two dbt projects?** A dbt invocation targets one adapter. RutaShip on Postgres
@@ -166,7 +172,7 @@ Total ≈ 7.75 h. That is the top of the budget. If we run behind, cut in this o
 - [x] Phase 1: Data modeling
 - [x] Phase 2: dbt refresher
 - [x] Phase 3: Governance → code
-- [ ] Phase 4: UDL / ontology / KG
+- [x] Phase 4: UDL / ontology / KG
 - [ ] Phase 5: Semantic Layer / MetricFlow
 - [ ] Phase 6: NL + MCP agent
 - [ ] Phase 7: BigQuery + Redshift + Airflow

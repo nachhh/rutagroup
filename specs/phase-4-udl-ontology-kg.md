@@ -46,11 +46,41 @@ Update `docs/diagrams/ontology.md` (final) and add `docs/diagrams/entity-resolut
 - ~550 customers resolved as multi-product (± the noise rate). Unit test on the matching rules.
 - `kg_edges` has every relation type from the ontology. The 2-hop query returns rows.
 
-## 🧭 Checkpoints
+## Status log
+- ✅ Replication from the `udl_replication` exposure (public only): 5 marts → `ship_replica` (Parquet, WRITE_TRUNCATE).
+- ✅ ER: precision 1.000, recall 0.974 vs truth (`make eval-er`); 0 decoys merged; 15 true pairs in the review queue;
+  2 steward decisions seeded. Unit test on veto/score/routing.
+- ✅ `dim_customer` (timeline merge, 1,904 customers, 554 multi-product), `fct_revenue` (107.5k rows, all FX resolved),
+  `fct_customer_monthly`, `fct_product_enrollment`. Churn 11.0% multi vs 30.4% single.
+- ✅ As-of at date grain: Phase 2 finding 20 → 8 → 0 (tie-break must prefer an active version on cancel days).
+- ✅ Ontology YAML → generated KG (122k nodes, 270k edges, all 11 relations); churn-neighbourhood query; govern R6.
+- ⚠️ Gotcha: enforced contract + `insert_overwrite` → `_dbt_max_partition` undeclared on incremental runs. Fixed with
+  an explicit `max(issued_date)` watermark.
+- Full `make udl`: 91 pass, 0 warn.
+- ✅ Quiz 4 done (4 questions).
+
+## 🧭 Decisions (settled)
+1. **Matching (A):** rule cascade with a **veto evaluated first**. Veto: both normalized tax_ids present and different →
+   never auto-merge (goes to review as `tax_conflict`). Rules: exact tax_id (1.0) → exact `email_sha256`, corporate
+   domains only (0.95) → same corporate domain + name `EDIT_DISTANCE` ≤ 2 (0.8) → name-only, same country (0.5).
+   Auto-merge ≥ 0.8; 0.5–0.8 → review; personal domains (gmail/hotmail/yahoo/outlook) are excluded from email rules.
+2. **Ambiguous (A):** `int_customer_review_queue` + steward decisions as a seed (`seed_match_decisions.csv`:
+   shipper_id, account_id, decision, reviewer, decided_at). Undecided pairs stay separate customers.
+3. **FX (A, hybrid):** `seed_fx_rates_monthly` (monthly AVERAGE rate, EUR base). `fct_revenue` stores `amount_local`,
+   `currency`, `fx_rate`, `amount_eur` (rate of the transaction month). It's a table rebuilt every run, so rate changes
+   propagate; closed months are locked by finance anyway. MetricFlow measures can't multiply by a rate from another
+   semantic model, so the converted column lives in the fact.
+4. **As-of grain (A):** join plans at DATE grain (`issued_date between date(valid_from) and date(valid_to)`); when
+   two versions overlap on the same day, QUALIFY prefers the *active* version (then the latest `valid_from`): a fee charged
+   on the cancel day belongs to the cancelled plan. The SCD2 stays truthful.
+- Revenue definition across products: Ship = `booking_fee`; Pay = subscription + txn_fee + freight_fee. The Pay
+  `FREIGHT` line is pass-through GMV (already counted as Ship GMV) → excluded. Summing GMV across products would double-count.
+
+## 🧭 Checkpoints (original)
 1. Matching rules and confidence threshold for auto-merge
 2. Ambiguous matches: drop, keep separate, or review queue?
 3. Revenue currency normalization: where and when (FX at transaction date vs month-end)?
 4. As-of join grain for billing (Phase 2 finding: 20 invoices issued hours before the subscription start on the same day):
    join at date grain, or normalize `valid_from` to the start of the day?
 
-## 🧠 Quiz 4: 4 questions
+## 🧠 Quiz 4: 4 questions (ER precision vs recall, the five layers, FX in the fact + incremental backfill, property graph vs RDF)

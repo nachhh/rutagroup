@@ -1,0 +1,117 @@
+version: 2
+
+# The UNIFIED DATA LAYER: entity-centric, conformed, governed. Public + contracted = what the semantic layer
+# (Phase 5), the knowledge graph and the agent (Phase 6) are allowed to build on.
+
+models:
+  - name: dim_customer
+    description: "Grain: 1 row per canonical customer version (SCD2, merged Ship + Pay timelines). Conformed across products."
+    config:
+      access: public
+      contract: {enforced: true}
+      meta: {classification: internal}
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [customer_key, valid_from]
+    columns:
+      - name: customer_sk
+        data_type: int64
+        description: "Surrogate key, one per version."
+        constraints: [{type: primary_key}]
+        data_tests: [unique, not_null]
+      - name: customer_key
+        data_type: int64
+        description: "Canonical (golden) key: one per real-world company across products."
+        data_tests: [not_null]
+      - {name: customer_name, data_type: string, description: "Survivorship: RutaShip name, else RutaPay legal name."}
+      - {name: tax_id_normalized, data_type: string}
+      - {name: country, data_type: string}
+      - {name: region, data_type: string, description: "Region as of the version (SCD2)."}
+      - {name: current_region, data_type: string, description: "Type-6: today's region on every version."}
+      - {name: ship_tier, data_type: string}
+      - {name: plan_code, data_type: string}
+      - {name: subscription_status, data_type: string}
+      - {name: shipper_id, data_type: int64}
+      - {name: account_id, data_type: string}
+      - {name: products, data_type: "array<string>"}
+      - {name: is_multi_product, data_type: bool}
+      - {name: match_rule, data_type: string}
+      - {name: match_confidence, data_type: float64}
+      - {name: valid_from, data_type: timestamp}
+      - {name: valid_to, data_type: timestamp}
+      - {name: is_current, data_type: bool}
+
+  - name: fct_revenue
+    description: "Grain: 1 row per revenue-bearing item across both products (Ship booking fees, Pay subscription/txn/freight fees). EUR at the month-average rate."
+    config:
+      access: public
+      contract: {enforced: true}
+      meta: {classification: internal}
+    columns:
+      - name: revenue_id
+        data_type: string
+        constraints: [{type: primary_key}]
+        data_tests: [unique, not_null]
+      - {name: source_system, data_type: string}
+      - name: customer_key
+        data_type: int64
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customer')
+                field: customer_key
+      - name: revenue_type
+        data_type: string
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [subscription, txn_fee, freight_fee, booking_fee]   # pass_through must never appear
+      - {name: revenue_date, data_type: date}
+      - {name: currency, data_type: string}
+      - {name: amount_local, data_type: numeric}
+      - {name: plan_code, data_type: string}
+      - {name: shipment_id, data_type: int64}
+      - {name: invoice_id, data_type: string}
+      - name: fx_rate
+        data_type: numeric
+        data_tests: [not_null]          # a missing rate silently drops revenue from EUR totals
+      - {name: amount_eur, data_type: numeric}
+
+  - name: fct_customer_monthly
+    description: "Grain: 1 row per customer per active month (periodic snapshot). mrr_eur is semi-additive."
+    config:
+      access: public
+      contract: {enforced: true}
+      meta: {classification: internal}
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [customer_key, month]
+    columns:
+      - {name: customer_key, data_type: int64}
+      - {name: month, data_type: date}
+      - {name: revenue_eur, data_type: numeric}
+      - {name: mrr_eur, data_type: numeric}
+      - {name: ship_revenue_eur, data_type: numeric}
+      - {name: pay_revenue_eur, data_type: numeric}
+      - {name: shipments, data_type: int64}
+      - {name: gmv_eur, data_type: numeric}
+      - {name: is_multi_product_active, data_type: bool}
+
+  - name: fct_product_enrollment
+    description: "Grain: 1 row per customer × product (factless coverage fact)."
+    config:
+      access: public
+      contract: {enforced: true}
+      meta: {classification: internal}
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [customer_key, product]
+    columns:
+      - {name: customer_key, data_type: int64}
+      - {name: product, data_type: string}
+      - {name: product_customer_id, data_type: string}
+      - {name: enrolled_at, data_type: timestamp}

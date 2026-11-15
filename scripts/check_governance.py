@@ -13,12 +13,17 @@ Rules for PUBLIC models (= data products, consumable by other projects, the sema
 Rule for every MART (public or not):
   R5 must have a primary-key test: unique + not_null on one column, unique_combination_of_columns,
      or a primary_key constraint
+Rule for the ONTOLOGY (ontology/ruta_ontology.yml, Phase 4):
+  R6 every class must map (`maps_to: <project>.<model>`) to a PUBLIC model or a seed: the meaning layer may only
+     point at governed data products, never at staging or private internals
 """
 
 import json
 import re
 import sys
 from pathlib import Path
+
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECTS = ["ruta_ship", "ruta_udl"]
@@ -88,6 +93,30 @@ def check(project):
     return public, violations
 
 
+def check_ontology():
+    onto_path = ROOT / "ontology/ruta_ontology.yml"
+    if not onto_path.exists():
+        return []
+    onto = yaml.safe_load(onto_path.read_text())
+    resources = {}
+    for project in PROJECTS:
+        m = json.loads((ROOT / "dbt" / project / "target" / "manifest.json").read_text())
+        for n in m["nodes"].values():
+            if n["resource_type"] == "seed":
+                resources[f"{project}.{n['name']}"] = "seed"
+            elif n["resource_type"] == "model" and (n.get("is_latest_version") is not False):
+                resources[f"{project}.{n['name']}"] = n.get("access")
+    violations = []
+    for cls, spec in onto["classes"].items():
+        target = spec.get("maps_to")
+        kind = resources.get(target)
+        if kind is None:
+            violations.append((cls, "R6", f"maps_to `{target}` does not exist"))
+        elif kind not in ("public", "seed"):
+            violations.append((cls, "R6", f"maps_to `{target}` is `{kind}`, not a public model or seed"))
+    return violations
+
+
 def main():
     failed = False
     for project in PROJECTS:
@@ -99,6 +128,14 @@ def main():
                 print(f"  ❌ {rule} {name}: {msg}")
         else:
             print("  ✅ all governance rules pass")
+    onto_violations = check_ontology()
+    print("\n[ontology] classes → public data products")
+    if onto_violations:
+        failed = True
+        for name, rule, msg in onto_violations:
+            print(f"  ❌ {rule} {name}: {msg}")
+    else:
+        print("  ✅ every class maps to a public model or seed")
     sys.exit(1 if failed else 0)
 
 

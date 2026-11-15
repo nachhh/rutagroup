@@ -1,0 +1,65 @@
+version: 2
+
+models:
+  - name: int_customer_candidates
+    description: "Grain: 1 row per source record (current shipper or Pay account), normalized for matching."
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, source_id]
+  - name: int_customer_pairs
+    description: "Grain: 1 row per blocked (shipper, account) pair where a rule fired. Veto → score → routing."
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [shipper_id, account_id]
+    columns:
+      - name: routing
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [auto_merge, review, review_conflict]
+  - name: int_customer_matches
+    description: "Grain: 1 row per accepted match (auto_merge + steward decisions), enforced 1:1."
+    columns:
+      - name: shipper_id
+        data_tests: [unique, not_null]
+      - name: account_id
+        data_tests: [unique, not_null]
+  - name: int_customer_review_queue
+    description: "Grain: 1 row per undecided ambiguous pair, for data stewards."
+  - name: int_customer_xwalk
+    description: "Grain: 1 row per source record → canonical customer_key. The crosswalk of the UDL."
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, source_id]
+    columns:
+      - name: customer_key
+        data_tests: [not_null]
+
+unit_tests:
+  # The matching RULES are business logic → unit-test them with crafted records (no warehouse data involved).
+  - name: test_matching_rules_veto_and_routing
+    model: int_customer_pairs
+    given:
+      - input: ref('int_customer_candidates')
+        rows:
+          # 1) same tax id, different-looking names → tax_id_exact, auto_merge
+          - {source_system: ship, source_id: "1", name_norm: transportes garcia, tax_id_norm: B11111111, email_sha256: h1, email_domain: garcia.es, is_personal_domain: false, country: ES}
+          - {source_system: pay,  source_id: a1,  name_norm: transp garcia,      tax_id_norm: B11111111, email_sha256: x1, email_domain: other.es,  is_personal_domain: false, country: ES}
+          # 2) decoy: identical name + same domain but DIFFERENT tax ids → veto wins → review_conflict
+          - {source_system: ship, source_id: "2", name_norm: alimentos rio, tax_id_norm: B22222222, email_sha256: h2, email_domain: rio.es, is_personal_domain: false, country: ES}
+          - {source_system: pay,  source_id: a2,  name_norm: alimentos rio, tax_id_norm: F99999999, email_sha256: x2, email_domain: rio.es, is_personal_domain: false, country: ES}
+          # 3) tax id missing on one side, same corporate email hash → email_exact, auto_merge
+          - {source_system: ship, source_id: "3", name_norm: grupo vega, tax_id_norm: null, email_sha256: h3, email_domain: vega.mx, is_personal_domain: false, country: MX}
+          - {source_system: pay,  source_id: a3,  name_norm: grupo vegas, tax_id_norm: A33333333, email_sha256: h3, email_domain: vega.mx, is_personal_domain: false, country: MX}
+          # 4) only a similar name, personal email domain → name_only, review
+          - {source_system: ship, source_id: "4", name_norm: textiles jacobs, tax_id_norm: null, email_sha256: h4, email_domain: gmail.com, is_personal_domain: true, country: CO}
+          - {source_system: pay,  source_id: a4,  name_norm: textiles jacob,  tax_id_norm: null, email_sha256: x4, email_domain: gmail.com, is_personal_domain: true, country: CO}
+    expect:
+      rows:
+        - {shipper_id: "1", account_id: a1, match_rule: tax_id_exact, routing: auto_merge, tax_conflict: false}
+        - {shipper_id: "2", account_id: a2, match_rule: domain_and_name, routing: review_conflict, tax_conflict: true}
+        - {shipper_id: "3", account_id: a3, match_rule: email_exact, routing: auto_merge, tax_conflict: false}
+        - {shipper_id: "4", account_id: a4, match_rule: name_only, routing: review, tax_conflict: false}

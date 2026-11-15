@@ -23,9 +23,13 @@ exposures:
     maturity: low
     description: "Phase 6: exposes governed semantic-layer metrics to an LLM agent over MCP. Only public models."
     depends_on:
-      - ref('fct_invoice_lines')
+      - ref('dim_customer')
+      - ref('fct_revenue')
+      - ref('fct_customer_monthly')
       - ref('fct_payments')
       - ref('dim_date')
+      - ref('kg_nodes')
+      - ref('kg_edges')
     owner:
       name: Data platform team (UDL)
       email: data-platform@example.com

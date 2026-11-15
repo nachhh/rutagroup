@@ -5,7 +5,7 @@ export
 export DBT_PROFILES_DIR := $(CURDIR)
 DBT := uv run dbt
 
-.PHONY: help up down data load load-pg load-bq deps ship udl debug clean day2 snapshot freshness govern pg-roles bq-governance
+.PHONY: help up down data load load-pg load-bq deps ship udl debug clean day2 snapshot freshness govern pg-roles bq-governance replicate ontology eval-er
 
 help:            ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -42,6 +42,13 @@ day2:            ## simulate day-2 changes in RutaShip source (incrementals, sna
 udl:             ## dbt build UDL (BigQuery)
 	cd dbt/ruta_udl && $(DBT) build
 
+replicate:       ## RutaShip PUBLIC marts (Postgres) → BigQuery ship_replica (simulated UNLOAD → S3 → GCS → BQ)
+	cd dbt/ruta_ship && $(DBT) parse --quiet
+	uv run python scripts/replicate_ship_to_bq.py
+ontology:        ## generate KG dbt models (kg_nodes, kg_edges) from ontology/ruta_ontology.yml
+	uv run python scripts/generate_kg_models.py
+eval-er:         ## score entity resolution against the generator's ground truth (precision / recall)
+	uv run python scripts/eval_entity_resolution.py
 pg-roles:        ## create least-privilege roles in Postgres (analyst, pii_reader, pii_reader_iberia)
 	docker exec -i ruta_pg psql -U $(PG_USER) -d $(PG_DB) -q < scripts/setup_pg_roles.sql
 govern:          ## governance CI gate: dbt parse both projects, then policy checks on manifest.json

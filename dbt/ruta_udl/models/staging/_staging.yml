@@ -4,6 +4,9 @@ models:
   - name: stg_pay__accounts
     description: "Grain: 1 row per RutaPay account. Primary address picked per decision 2A."
     config:
+      # PROTECTED (not private): the pay_domain → udl_core interface inside this shared project.
+      # In a real dbt Mesh, Pay would be its own project exposing a PUBLIC contracted model instead.
+      access: protected
       meta: {classification: confidential}
     columns:
       - name: account_id
@@ -18,6 +21,8 @@ models:
         config: {meta: {pii: true, classification: confidential}, tags: [pii]}
   - name: stg_pay__invoices
     description: "Grain: 1 row per invoice header."
+    config:
+      access: protected   # pay_domain → udl_core interface (invoice ↔ shipment link for the KG)
     columns:
       - name: invoice_id
         data_tests: [unique, not_null]
