@@ -2,6 +2,8 @@ version: 2
 models:
   - name: int_subscriptions_scd2
     description: "Grain: 1 row per account × subscription version. SCD2 derived from the change log with LEAD()."
+    config:
+      access: protected   # pay_domain → udl_core interface (plan history for dim_customer)
     columns:
       - name: subscription_sk
         data_tests: [unique, not_null]

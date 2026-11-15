@@ -20,16 +20,27 @@ models:
       +materialized: view
       +schema: staging
       +access: private
+      ship_replica:                  # staging over the replicated RutaShip public marts → owned by the UDL team
+        +group: udl_core
     intermediate:
       +materialized: view
       +schema: intermediate
       +access: private
+      entity_resolution:             # crosswalk = the heart of the UDL
+        +group: udl_core
     marts:
       +materialized: table
       +schema: marts
       +access: protected             # data products opt in to `public` in _marts.yml
       # Push dbt descriptions to BigQuery column descriptions (and policy tags, when configured).
       +persist_docs: {relation: true, columns: true}
+      udl:                           # conformed, cross-product marts (Phase 4)
+        +group: udl_core
+    kg:                              # knowledge graph, GENERATED from ontology/ruta_ontology.yml (make ontology)
+      +materialized: table
+      +schema: kg
+      +group: udl_core
+      +access: public
 
 seeds:
   ruta_udl:

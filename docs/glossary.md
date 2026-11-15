@@ -91,3 +91,26 @@ Grows phase by phase. Format: **English** · *Español*: one-line definition.
 | manifest.json (dbt) | manifest.json | dbt's compiled project graph with all configs and metadata; the input for CI checks, `--defer`, docs |
 | Exposure (dbt) | Exposición | A declared downstream consumer (dashboard, app) that closes the lineage graph |
 | Data steward / owner | Responsable de datos | The accountable person/team for a dataset's quality, access and definitions |
+| Crosswalk (xref) | Tabla de correspondencias | Maps each source-system id to the canonical entity key |
+| Blocking | Bloqueo (blocking) | Only comparing record pairs that share a cheap key, to avoid comparing everything with everything |
+| Matching rule | Regla de coincidencia | Deterministic or fuzzy condition that suggests two records are the same entity |
+| Fellegi–Sunter | Fellegi–Sunter | Probabilistic record linkage: weights agreement per field into a match score (Splink implements it) |
+| Veto (negative evidence) | Veto (evidencia negativa) | A conflicting strong key that blocks a merge regardless of other similarity |
+| Edit distance (Levenshtein) | Distancia de edición | Minimum single-character edits between two strings (BigQuery `EDIT_DISTANCE`) |
+| Survivorship | Supervivencia (de atributos) | Rules for which source's value wins in the golden record |
+| Golden record | Registro maestro | The single best version of an entity assembled from all sources |
+| MDM (Master Data Management) | Gestión de datos maestros | Discipline and tooling to maintain golden records operationally |
+| Data stewardship | Custodia de datos | Humans accountable for resolving ambiguous data (e.g. the match review queue) |
+| Key registry | Registro de claves | Persisted table that assigns canonical keys once and never reissues them |
+| Precision / recall | Precisión / exhaustividad | Correct merges / all merges · correct merges / all true pairs |
+| Timeline merge (SCD2) | Fusión de líneas de tiempo | Combining several SCD2 histories by unioning their change points into new intervals |
+| Pass-through revenue | Ingreso de paso | Money collected on behalf of a third party (freight for carriers): not revenue |
+| Average vs closing FX rate | Tipo de cambio medio vs de cierre | Income converted at the period average; balances at the period-end rate |
+| Class / instance | Clase / instancia | Concept (Customer) vs a concrete member (customer 123) |
+| Predicate / relation | Predicado / relación | The named link between two classes (Customer *books* Shipment) |
+| RDF triple | Tripleta RDF | Subject–predicate–object: the atomic fact in RDF knowledge graphs |
+| OWL | OWL | Web Ontology Language: formal ontologies with inference |
+| SPARQL | SPARQL | Query language for RDF graphs |
+| Property graph | Grafo de propiedades | Nodes and edges carrying key-value properties (Neo4j, GQL, Spanner Graph) |
+| GQL | GQL | ISO standard graph query language (`MATCH (a)-[:rel]->(b)`) |
+| Replication (UNLOAD → S3 → GCS) | Replicación | Redshift exports Parquet to S3, transfer to GCS, BigQuery loads it |

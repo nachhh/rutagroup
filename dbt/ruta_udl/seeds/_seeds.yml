@@ -10,3 +10,21 @@ seeds:
     columns:
       - name: plan_code
         data_tests: [unique, not_null]
+  - name: seed_fx_rates_monthly
+    description: "Monthly AVERAGE FX rates (local units per 1 EUR). Income is converted at the period-average rate (accounting convention); closed months are locked by finance."
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [month, currency]
+    config:
+      column_types: {month: date, currency: string, rate_per_eur: numeric, rate_type: string}
+  - name: seed_match_decisions
+    description: "Data-steward decisions on review-queue pairs (match / no_match). Stewardship as code: every decision is a reviewed PR with reviewer + date."
+    config:
+      column_types: {shipper_id: int64, account_id: string, decision: string, reviewer: string, decided_at: timestamp}
+    columns:
+      - name: decision
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [match, no_match]

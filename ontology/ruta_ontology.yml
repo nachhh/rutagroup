@@ -1,0 +1,226 @@
+# Ruta Group ontology: the MEANING of the Unified Data Layer, written down once.
+#
+# A lightweight YAML ontology (not OWL/RDF): classes = business concepts, relations = how they connect.
+# One file, four uses:
+#   1. Documentation for humans (what is a "Customer" here? which table implements it?).
+#   2. Synonyms + descriptions for the NL agent (Phase 6): "client", "cuenta", "shipper" → Customer.
+#   3. CODE GENERATION of the knowledge graph: `make ontology` renders dbt models kg_nodes / kg_edges from the
+#      `nodes:` / `edges:` blocks below (scripts/generate_kg_models.py). Change the meaning here, not in SQL.
+#   4. A governance check: every class must map to a PUBLIC model (or a seed) → `make govern` rule R6.
+#
+# `maps_to` = the governed data product that implements the class ("<project>.<model>").
+# `nodes.from` / `edges.from` = SQL FROM clause (dbt Jinja allowed) used to materialize instances in the KG.
+
+version: 1
+namespace: ruta
+
+classes:
+  Customer:
+    description: "A company that uses at least one Ruta product. One canonical entity across RutaShip and RutaPay (entity resolution)."
+    synonyms: [client, account, shipper, merchant, cliente, cuenta, empresa]
+    maps_to: ruta_udl.dim_customer
+    identifier: customer_key
+    nodes:
+      from: "{{ ref('dim_customer') }} where is_current"
+      id: customer_key
+      label: customer_name
+      properties: [region, country, ship_tier, plan_code, subscription_status, is_multi_product, "subscription_status = 'cancelled' as is_churned"]
+
+  Shipment:
+    description: "A freight movement booked by a customer, carried by a carrier along a lane."
+    synonyms: [load, booking, shipment, envío, carga]
+    maps_to: ruta_ship.fct_shipments
+    identifier: shipment_id
+    nodes:
+      from: "{{ ref('stg_ship__shipments') }}"
+      id: shipment_id
+      label: "concat('SHP-', cast(shipment_id as string))"
+      properties: [status, currency, gmv_amount, booked_date, is_on_time]
+
+  Carrier:
+    description: "A transport company that moves shipments for RutaShip."
+    synonyms: [transporter, trucking company, transportista]
+    maps_to: ruta_ship.dim_carrier
+    identifier: carrier_id
+    nodes:
+      from: "{{ source('ship_replica', 'dim_carrier') }}"
+      id: carrier_id
+      label: carrier_name
+      properties: [mode]
+
+  Lane:
+    description: "An origin region → destination region route."
+    synonyms: [route, corridor, ruta]
+    maps_to: ruta_ship.dim_lane
+    identifier: lane_id
+    nodes:
+      from: "{{ source('ship_replica', 'dim_lane') }}"
+      id: lane_id
+      label: "concat(origin_region, ' → ', dest_region)"
+      properties: [distance_km]
+
+  Region:
+    description: "Conformed commercial territory (iberia, mexico, andean, southern_cone)."
+    synonyms: [territory, market, región, zona]
+    maps_to: ruta_udl.seed_region_map
+    identifier: region
+    nodes:
+      from: "(select distinct region from {{ ref('seed_region_map') }})"
+      id: region
+      label: region
+      properties: []
+
+  Invoice:
+    description: "A billing document issued by RutaPay (subscription, fees, or freight collected for a carrier)."
+    synonyms: [bill, invoice, factura]
+    maps_to: ruta_udl.fct_invoice_lines
+    identifier: invoice_id
+    nodes:
+      from: "{{ ref('stg_pay__invoices') }}"
+      id: invoice_id
+      label: invoice_number
+      properties: [status, currency, total, issued_at]
+
+  Payment:
+    description: "The payment outcome of an invoice (paid, failed attempts, refunds)."
+    synonyms: [payment, collection, cobro, pago]
+    maps_to: ruta_udl.fct_payments
+    identifier: invoice_id
+    nodes:
+      from: "{{ ref('fct_payments') }}"
+      id: invoice_id
+      label: "concat('PAY-', invoice_id)"
+      properties: [is_paid, is_late, amount_paid, amount_refunded, method_type]
+
+  Plan:
+    description: "A RutaPay subscription tier with a monthly price."
+    synonyms: [tier, subscription, package, plan]
+    maps_to: ruta_udl.seed_plans
+    identifier: plan_code
+    nodes:
+      from: "{{ ref('seed_plans') }}"
+      id: plan_code
+      label: plan_code
+      properties: []
+
+  Product:
+    description: "A Ruta product line: RutaShip (freight marketplace) or RutaPay (billing & payments)."
+    synonyms: [product, line of business, producto]
+    maps_to: ruta_udl.fct_product_enrollment
+    identifier: product
+    nodes:
+      from: "(select distinct product from {{ ref('fct_product_enrollment') }})"
+      id: product
+      label: product
+      properties: []
+
+relations:
+  - subject: Customer
+    predicate: books
+    object: Shipment
+    cardinality: "1..*"
+    description: "A customer books shipments on RutaShip."
+    edges:
+      from: "{{ ref('stg_ship__shipments') }} s join {{ ref('int_customer_xwalk') }} x on x.source_system = 'ship' and x.source_id = cast(s.shipper_id as string)"
+      subject_id: x.customer_key
+      object_id: s.shipment_id
+      valid_from: s.booked_at
+
+  - subject: Carrier
+    predicate: carries
+    object: Shipment
+    cardinality: "1..*"
+    edges:
+      from: "{{ ref('stg_ship__shipments') }}"
+      subject_id: carrier_id
+      object_id: shipment_id
+
+  - subject: Shipment
+    predicate: follows
+    object: Lane
+    cardinality: "*..1"
+    edges:
+      from: "{{ ref('stg_ship__shipments') }}"
+      subject_id: shipment_id
+      object_id: lane_id
+
+  - subject: Lane
+    predicate: originates_in
+    object: Region
+    cardinality: "*..1"
+    edges:
+      from: "{{ source('ship_replica', 'dim_lane') }}"
+      subject_id: lane_id
+      object_id: origin_region
+
+  - subject: Lane
+    predicate: ends_in
+    object: Region
+    cardinality: "*..1"
+    edges:
+      from: "{{ source('ship_replica', 'dim_lane') }}"
+      subject_id: lane_id
+      object_id: dest_region
+
+  - subject: Customer
+    predicate: located_in
+    object: Region
+    cardinality: "*..1"
+    edges:
+      from: "{{ ref('dim_customer') }} where is_current and region is not null"
+      subject_id: customer_key
+      object_id: region
+
+  - subject: Customer
+    predicate: subscribes_to
+    object: Plan
+    cardinality: "*..*"
+    temporal: true
+    description: "Plan held over a time window (SCD2 from the subscription change log)."
+    edges:
+      from: "{{ ref('int_subscriptions_scd2') }} s join {{ ref('int_customer_xwalk') }} x on x.source_system = 'pay' and x.source_id = s.account_id where s.plan_code is not null"
+      subject_id: x.customer_key
+      object_id: s.plan_code
+      valid_from: s.valid_from
+      valid_to: s.valid_to
+
+  - subject: Customer
+    predicate: uses
+    object: Product
+    cardinality: "1..2"
+    edges:
+      from: "{{ ref('fct_product_enrollment') }}"
+      subject_id: customer_key
+      object_id: product
+      valid_from: enrolled_at
+
+  - subject: Invoice
+    predicate: billed_to
+    object: Customer
+    cardinality: "*..1"
+    edges:
+      from: "{{ ref('stg_pay__invoices') }} i join {{ ref('int_customer_xwalk') }} x on x.source_system = 'pay' and x.source_id = i.account_id"
+      subject_id: i.invoice_id
+      object_id: x.customer_key
+      valid_from: i.issued_at
+
+  - subject: Invoice
+    predicate: bills_for
+    object: Shipment
+    cardinality: "*..1"
+    description: "Cross-product link: RutaPay collects freight for a RutaShip shipment (metadata.shipment_ref)."
+    edges:
+      from: "{{ ref('stg_pay__invoices') }} where shipment_id is not null"
+      subject_id: invoice_id
+      object_id: shipment_id
+      valid_from: issued_at
+
+  - subject: Payment
+    predicate: settles
+    object: Invoice
+    cardinality: "1..1"
+    edges:
+      from: "{{ ref('fct_payments') }} where is_paid"
+      subject_id: invoice_id
+      object_id: invoice_id
+      valid_from: paid_at

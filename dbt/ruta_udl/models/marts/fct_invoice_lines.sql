@@ -22,7 +22,10 @@
 with lines as (
     select * from {{ ref('stg_pay__invoice_lines') }}
     {% if is_incremental() %}
-    where issued_date >= date_sub(_dbt_max_partition, interval {{ var('overwrite_lookback_days', 7) }} day)
+    -- Watermark computed explicitly. dbt's `_dbt_max_partition` scripting variable is NOT declared when the model has
+    -- an ENFORCED CONTRACT (dbt-bigquery builds the temp table through a different path) → "Unrecognized name".
+    -- Found in Phase 4: Phase 3 only ran this model with --full-refresh, which skips the incremental branch.
+    where issued_date >= date_sub((select max(issued_date) from {{ this }}), interval {{ var('overwrite_lookback_days', 7) }} day)
     {% endif %}
 )
 
@@ -45,7 +48,12 @@ select
     l.billed_legal_name,
     current_timestamp()                             as _dbt_loaded_at
 from lines l
+-- AS-OF JOIN AT DATE GRAIN (Phase 4, decision 4A). Billing works in days: an invoice issued at 02:00 for a plan that
+-- started at 10:00 the same day belongs to that plan. Joining on timestamps left 20 fee lines without a plan.
+-- At date grain two versions can overlap on a change day → QUALIFY picks one. Tie-break = business meaning:
+-- prefer an ACTIVE version (a fee charged on the cancel day belongs to the plan being cancelled), then the latest.
+-- The SCD2 itself stays truthful (timestamps untouched); only the join adopts billing's grain.
 left join {{ ref('int_subscriptions_scd2') }} s
   on  s.account_id = l.account_id
-  and l.issued_at >= s.valid_from
-  and l.issued_at <  s.valid_to
+  and l.issued_date between date(s.valid_from) and date(s.valid_to)
+qualify row_number() over (partition by l.invoice_id, l.line_no order by s.plan_code is not null desc, s.valid_from desc) = 1

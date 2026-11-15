@@ -61,4 +61,27 @@ flowchart LR
   dd[dim_date<br/>GENERATE_DATE_ARRAY]:::table
   s1[seed_region_map]:::seed
   s2[seed_plans]:::seed
+
+  %% Phase 4: UDL
+  rep[(ship_replica.*<br/>public marts from PG)] --> stg_shipv[stg_ship__shipper_versions]:::view
+  rep --> stg_shp[stg_ship__shipments]:::view
+  stg_shipv --> cand[int_customer_candidates]:::view
+  stg_acc --> cand
+  cand --> pairs[int_customer_pairs<br/>veto · score · route]:::view
+  pairs --> matches[int_customer_matches]:::view
+  sd[seed_match_decisions]:::seed --> matches
+  pairs --> queue[int_customer_review_queue]:::view
+  matches --> xwalk[int_customer_xwalk]:::view
+  xwalk --> dimc[dim_customer<br/>timeline-merge SCD2]:::table
+  scd2 --> dimc
+  xwalk --> frev[fct_revenue<br/>EUR at month avg]:::table
+  fil --> frev
+  stg_shp --> frev
+  fx[seed_fx_rates_monthly]:::seed --> frev
+  frev --> fcm[fct_customer_monthly]:::table
+  xwalk --> enr[fct_product_enrollment]:::table
+  onto{{ontology YAML}} -. generates .-> kgn[kg_nodes]:::table
+  onto -. generates .-> kge[kg_edges]:::table
+  dimc --> kgn
+  xwalk --> kge
 ```

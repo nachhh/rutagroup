@@ -1,0 +1,21 @@
+version: 2
+
+# The dbt Mesh boundary, hand-rolled: RutaShip's PUBLIC marts arrive as tables replicated from Postgres
+# (scripts/replicate_ship_to_bq.py). With dbt Cloud Mesh this would be a cross-project ref:
+#   {{ ref('ruta_ship', 'fct_shipments') }}   (only allowed because the model is access: public)
+sources:
+  - name: ship_replica
+    description: RutaShip public marts replicated from Postgres (≈ Redshift UNLOAD → S3 → GCS → BQ load).
+    schema: ship_replica
+    config:
+      loaded_at_field: _replicated_at   # replication timestamp → freshness of the REPLICA, not of RutaShip
+      freshness:
+        warn_after: {count: 1, period: day}
+        error_after: {count: 7, period: day}
+    tables:
+      - name: fct_shipments
+      - name: fct_shipment_lifecycle
+      - name: dim_shipper
+        description: "Replica of dim_shipper v2 (latest version): SCD2, email_sha256 instead of raw email."
+      - name: dim_carrier
+      - name: dim_lane
