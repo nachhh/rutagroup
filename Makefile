@@ -5,7 +5,7 @@ export
 export DBT_PROFILES_DIR := $(CURDIR)
 DBT := uv run dbt
 
-.PHONY: help up down data load load-pg load-bq deps ship udl debug clean day2 snapshot freshness govern pg-roles bq-governance replicate ontology eval-er semantic mf ask
+.PHONY: help up down data load load-pg load-bq deps ship udl debug clean day2 snapshot freshness govern pg-roles bq-governance replicate ontology eval-er semantic mf ask lineage airflow-install airflow-test airflow-up
 
 help:            ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -70,3 +70,21 @@ bq-governance:   ## BigQuery: policy tag + data masking + row access policy + au
 clean:
 	cd dbt/ruta_ship && $(DBT) clean
 	cd dbt/ruta_udl && $(DBT) clean
+
+# --- Phase 7: Airflow (own venv: Airflow and dbt pin conflicting deps) + end-to-end lineage ---
+AIRFLOW_ENV := AIRFLOW_HOME=$(CURDIR)/airflow_home AIRFLOW__CORE__DAGS_FOLDER=$(CURDIR)/airflow/dags AIRFLOW__CORE__LOAD_EXAMPLES=False
+AIRFLOW := $(AIRFLOW_ENV) airflow/.venv/bin/airflow
+lineage:         ## generate docs/diagrams/end-to-end-lineage.md from both manifests + semantic manifest + exposures
+	cd dbt/ruta_ship && $(DBT) parse -q
+	cd dbt/ruta_udl && $(DBT) parse -q
+	uv run python scripts/lineage_e2e.py
+airflow-install: ## Airflow 3.1 in airflow/.venv (pinned with the official constraints file)
+	uv venv -q airflow/.venv --python 3.12
+	VIRTUAL_ENV=airflow/.venv uv pip install -q "apache-airflow==3.1.0" --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.1.0/constraints-3.12.txt
+	$(AIRFLOW) db migrate
+airflow-test:    ## one full in-process run of ruta_pipeline (no scheduler); demo data is old → freshness downgraded
+	$(AIRFLOW) dags reserialize
+	$(AIRFLOW) dags test ruta_pipeline -c '{"enforce_freshness": false}'
+	$(AIRFLOW) dags test ruta_semantic_checks
+airflow-up:      ## Airflow UI + scheduler at http://localhost:8080 (credentials printed on first start)
+	$(AIRFLOW) standalone

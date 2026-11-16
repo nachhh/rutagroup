@@ -4,7 +4,7 @@
 Be able to defend an architecture for a company with data in both Redshift and BigQuery, and show
 end-to-end orchestration and lineage with Airflow.
 
-## Concepts → `docs/07_bq_redshift.md`
+## Concepts → `docs/07_bq_redshift_airflow.md`
 | Pattern | How | Pros | Cons |
 |---|---|---|---|
 | 1. Batch replicate RS → BQ | `UNLOAD` (Parquet) → S3 → **Storage Transfer Service** → GCS → BQ load / BigLake external tables | Simple, cheap at batch cadence, BQ becomes the UDL hub | Egress cost (AWS → GCP), latency, two copies |
@@ -23,8 +23,10 @@ consistency across clouds.
 ## Files
 | File | Content |
 |---|---|
-| `airflow/dags/ruta_pipeline.py` | Airflow 3 DAG: `generate_data → load_pg → dbt_build_ship → replicate_to_bq → dbt_build_udl → governance_check → mf_saved_queries`. `BashOperator`, with comments on **Cosmos** (renders dbt models as tasks), Datasets/Assets for data-aware scheduling, retries/SLAs, and OpenLineage |
-| `airflow/README` section in the spec | How to run: separate uv venv, `airflow standalone`, `AIRFLOW_HOME=./airflow_home` (gitignored) |
+| `airflow/dags/ruta_pipeline.py` | Airflow 3.1. **Two DAGs linked by an Asset.** `ruta_pipeline` (@daily): task groups `extract_load` (load_ship_source, load_pay_source → bq_governance), `redshift` (ship_freshness gate → ship_build), `cross_cloud` (replicate_to_bq), `udl` (kg_codegen → governance_gate → udl_build). `ruta_semantic_checks` (schedule=[udl_marts Asset]): mf_validate → saved_queries (CSV) → agent_smoke_test (opt-in Param; exit 99 = skipped). `BashOperator` calling the underlying commands in the project venv (not `make`); Cosmos, OpenLineage, retries/timeouts explained in the module docstring. Data generation is NOT a task (sources are apps in production) |
+| `scripts/lineage_e2e.py` → `docs/diagrams/end-to-end-lineage.md` | (added) End-to-end lineage generated from both manifests + semantic manifest + exposures; the cross-cloud edge from the `udl_replication` exposure ↔ `ship_replica` sources. `make lineage` |
+| `docs/07_bq_redshift_airflow.md`, `docs/diagrams/pipeline-flow.md` | Patterns, dialect translation, DAG decisions table, lineage layers |
+| Makefile | `airflow-install` (airflow/.venv + constraints), `airflow-test` (`airflow dags test`), `airflow-up` (standalone UI), `lineage`. `AIRFLOW_HOME=./airflow_home` (gitignored) |
 
 ## Optional hands-on (if time allows)
 Run `stg_pay` models against Postgres too, using `adapter.dispatch` macros. This shows how far "same SQL, two
@@ -33,6 +35,14 @@ engines" goes before nested types break it, which is a good argument for *where*
 ## Acceptance criteria
 - The DAG parses (`airflow dags list`). One full run succeeds, or is skipped if we're cutting time
 - You can whiteboard the pattern you'd choose for Ruta and justify it in 2 minutes
+
+## Implementation decisions (made while the user was away; to review)
+1. One task per dbt project, not Cosmos (per-model tasks): simpler, `dbt build` already orders and skips on test failure.
+2. Quality gates (`ship_freshness`, `governance_gate`) have `retries=0`. Freshness is enforced by default; the
+   `enforce_freshness` run param downgrades it for demo runs (the synthetic data ends 2026-10-31, so it is stale).
+3. Assets connect the DAGs (data-aware scheduling) instead of cron offsets or ExternalTaskSensor.
+4. End-to-end lineage generated from metadata (`make lineage`) instead of installing Marquez/OpenLineage; the
+   OpenLineage path is documented as the production answer.
 
 ## 🧭 Checkpoint
 Which pattern would you defend, and why? (Answer in your own words; we refine it together.)
