@@ -127,3 +127,10 @@ Grows phase by phase. Format: **English** · *Español*: one-line definition.
 | Open Semantic Interchange (OSI) | OSI | Industry effort for one portable semantic-layer spec |
 | Right-censoring | Censura por la derecha | Recent periods can't be judged yet (e.g. churn needs 90 days of future) |
 | Left-censoring | Censura por la izquierda | History starts mid-stream: the first observed event isn't the true first |
+| Text-to-SQL | Texto a SQL | The LLM writes raw SQL against tables: flexible, but ungoverned and inconsistent |
+| Text-to-metric-query | Texto a consulta de métricas | The LLM only picks metrics/dimensions/filters; the semantic layer writes the SQL |
+| MCP (Model Context Protocol) | Protocolo de contexto de modelos | Open standard for exposing tools/resources/prompts to agents (client ↔ server, stdio or HTTP) |
+| MCP host / client / server | Host / cliente / servidor MCP | The app running the agent / its protocol connection / the process exposing tools |
+| Tool calling (function calling) | Llamada a herramientas | The LLM returns a structured call; the app executes it and feeds the result back |
+| Guardrail | Barandilla / salvaguarda | A server-enforced limit on what an agent can do (allowlist, read-only, row cap) |
+| Golden question set (eval) | Conjunto de preguntas de referencia | Questions with the expected metric query, used to test an agent |

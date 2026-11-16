@@ -65,12 +65,15 @@ make eval-er        # entity-resolution precision / recall vs the generator's gr
 make semantic       # validate the semantic layer + run the saved queries (the business question)
 make mf Q="--metrics total_revenue,customer_churn_rate --group-by customer__is_multi_product,metric_time__quarter"
 make mf Q="--metrics take_rate --group-by metric_time__year --explain"   # read the SQL MetricFlow writes
+
+# 9. NL agent over MCP (Phase 6). Needs ANTHROPIC_API_KEY in .env (Claude Haiku 5.5, ~$0.003 per question)
+make ask Q="Do customers using both products churn less? Break it down by region"
+make ask Q="Which carriers move the most freight for the client Grupo Cuevas, and its 2025 revenue?"
 ```
 
 Coming in later phases (targets are added as each phase lands):
 
 ```bash
-make ask Q="..." # Phase 6: natural-language question → MCP → semantic layer
 make all         # whole pipeline end-to-end (same steps as the Airflow DAG, Phase 7)
 make down        # stop Postgres (data persists in the Docker volume)
 ```
@@ -125,7 +128,7 @@ Postgres ("Redshift")                         BigQuery (free tier)
                                              └───────────────┬──────────────────────────────┘
          Airflow DAG orchestrates all of it                  │ MCP server (metrics tools)
                                                              ▼
-                                                   tiny NL agent (Gemini / Haiku)
+                                                   tiny NL agent (Claude Haiku)
 ```
 
 Full Mermaid diagrams are in [docs/diagrams/](docs/diagrams/):
@@ -194,7 +197,7 @@ Total ≈ 7.75 h. That is the top of the budget. If we run behind, cut in this o
 - [x] Phase 3: Governance → code
 - [x] Phase 4: UDL / ontology / KG
 - [x] Phase 5: Semantic Layer / MetricFlow
-- [ ] Phase 6: NL + MCP agent
+- [x] Phase 6: NL + MCP agent
 - [ ] Phase 7: BigQuery + Redshift + Airflow
 - [ ] Phase 8: Wrap-up
 
@@ -206,7 +209,7 @@ scripts/            generate_data.py, load_postgres.py, load_bigquery.py, replic
 dbt/ruta_ship/      dbt project on Postgres ("Redshift")
 dbt/ruta_udl/       dbt project on BigQuery (UDL + semantic layer + KG)
 ontology/           ruta_ontology.yml
-mcp/                metrics MCP server (wraps MetricFlow)
+mcp_server/         metrics MCP server (wraps MetricFlow + the KG)
 agent/              tiny NL agent (MCP client + LLM)
 airflow/dags/       ruta_pipeline.py
 specs/              one spec per phase

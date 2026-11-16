@@ -16,6 +16,9 @@ Rule for every MART (public or not):
 Rule for the ONTOLOGY (ontology/ruta_ontology.yml, Phase 4):
   R6 every class must map (`maps_to: <project>.<model>`) to a PUBLIC model or a seed: the meaning layer may only
      point at governed data products, never at staging or private internals
+  R7 every class's `semantic:` link must exist in the semantic layer: `{entity: x}` must be a MetricFlow entity and
+     `{dimension: x__y}` a dimension `y` on a semantic model that has entity `x`. The KG ↔ semantic-layer bridge is
+     declared once (ontology) and checked in CI, so renaming an entity in dbt can't silently break the agent.
 """
 
 import json
@@ -114,7 +117,26 @@ def check_ontology():
             violations.append((cls, "R6", f"maps_to `{target}` does not exist"))
         elif kind not in ("public", "seed"):
             violations.append((cls, "R6", f"maps_to `{target}` is `{kind}`, not a public model or seed"))
+    violations += check_semantic_links(onto)
     return violations
+
+
+def check_semantic_links(onto):
+    sm_path = ROOT / "dbt/ruta_udl/target/semantic_manifest.json"
+    sm = json.loads(sm_path.read_text())
+    entities, dims = set(), set()
+    for model in sm["semantic_models"]:
+        names = {e["name"] for e in model["entities"]} | {model.get("primary_entity")} - {None}
+        entities |= names
+        dims |= {f"{e}__{d['name']}" for e in names for d in model["dimensions"]}
+    out = []
+    for cls, spec in onto["classes"].items():
+        link = spec.get("semantic") or {}
+        if "entity" in link and link["entity"] not in entities:
+            out.append((cls, "R7", f"semantic entity `{link['entity']}` not found in the semantic layer"))
+        if "dimension" in link and link["dimension"] not in dims:
+            out.append((cls, "R7", f"semantic dimension `{link['dimension']}` not found in the semantic layer"))
+    return out
 
 
 def main():
@@ -129,13 +151,13 @@ def main():
         else:
             print("  ✅ all governance rules pass")
     onto_violations = check_ontology()
-    print("\n[ontology] classes → public data products")
+    print("\n[ontology] classes → public data products (R6) and semantic-layer links (R7)")
     if onto_violations:
         failed = True
         for name, rule, msg in onto_violations:
             print(f"  ❌ {rule} {name}: {msg}")
     else:
-        print("  ✅ every class maps to a public model or seed")
+        print("  ✅ every class maps to a public model or seed; every semantic link resolves")
     sys.exit(1 if failed else 0)
 
 

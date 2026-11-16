@@ -4,19 +4,19 @@
 sequenceDiagram
   actor U as User
   participant A as Agent (ask.py)
-  participant L as LLM (Gemini/Haiku)
+  participant L as LLM (Claude Haiku 5.5)
   participant M as MCP server
   participant MF as MetricFlow
   participant BQ as BigQuery
 
   U->>A: "Do multi-product customers churn less, by region?"
-  A->>M: list tools + ontology resource
-  A->>L: question + tool specs + synonyms
+  A->>M: list_tools (MCP)
+  A->>L: question + tool specs + context-layer rules
   L-->>A: call list_metrics()
   A->>M: list_metrics()
-  M-->>A: [churn_rate, total_revenue, ...] + descriptions
+  M-->>A: [customer_churn_rate, subscription_churn_rate, ...] + descriptions
   A->>L: tool result
-  L-->>A: call query_metrics(metrics=[churn_rate], group_by=[customer__is_multi_product, customer__region])
+  L-->>A: call query_metrics(metrics=[customer_churn_rate, subscription_churn_rate], group_by=[customer__is_multi_product, customer__region])
   A->>M: query_metrics(...)
   M->>M: validate names vs semantic_manifest (guardrail)
   M->>MF: mf query ... --csv
@@ -28,3 +28,7 @@ sequenceDiagram
   L-->>A: natural-language answer
   A-->>U: answer + the metric query used (auditable)
 ```
+
+Tools: `list_metrics`, `list_dimensions`, `list_entities`, `query_metrics` (semantic layer) · `get_ontology`
+(vocabulary) · `find_entity`, `kg_related` (knowledge graph). A relationship question ("carriers for Grupo Cuevas")
+goes `find_entity → kg_related`, then `query_metrics` with `where={{ Entity('customer') }} = <key>`.
