@@ -84,4 +84,19 @@ flowchart LR
   onto -. generates .-> kge[kg_edges]:::table
   dimc --> kgn
   xwalk --> kge
+
+  %% Phase 5: semantic layer
+  stg_shp --> fus[fct_udl_shipments<br/>customer_key · EUR]:::table
+  xwalk --> fus
+  fx --> fus
+  scd2 --> fcm
+  spine[metricflow_time_spine]:::table
+  sl{{semantic models + metrics<br/>_udl.yml · _metrics.yml}}
+  dimc -. SCD2 dims .-> sl
+  frev -.-> sl
+  fus -.-> sl
+  fcm -.-> sl
+  enr -.-> sl
+  spine -.-> sl
+  sl --> sq[saved queries]
 ```

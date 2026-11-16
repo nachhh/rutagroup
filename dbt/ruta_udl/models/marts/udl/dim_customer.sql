@@ -99,8 +99,13 @@ select
     array_length(p.products) > 1                                                        as is_multi_product,
     p.match_rule,
     p.match_confidence,
-    v.valid_from,
-    v.valid_to,
+    -- UTC DATETIME, not TIMESTAMP: semantic-layer convention (MetricFlow on BigQuery truncates DATE metric_time to
+    -- DATETIME and compares it with these columns in the SCD2 as-of join; TIMESTAMP vs DATETIME doesn't compare).
+    -- The FIRST version opens at the beginning of time: as-of joins at day/month grain (MetricFlow truncates
+    -- metric_time to midnight / the 1st) would otherwise miss facts dated before the first change point → null region.
+    if(v.valid_from = min(v.valid_from) over (partition by v.customer_key),
+       datetime '1900-01-01 00:00:00', datetime(v.valid_from))                         as valid_from,
+    datetime(v.valid_to)                                                                as valid_to,
     v.valid_to = timestamp '9999-12-31'                                                 as is_current
 from versions v
 join profile p using (customer_key)

@@ -6,6 +6,12 @@ version: 2
 models:
   - name: dim_customer
     description: "Grain: 1 row per canonical customer version (SCD2, merged Ship + Pay timelines). Conformed across products."
+    # SEMANTIC LAYER (Phase 5): an SCD2 dimension-only semantic model. `customer` is a NATURAL entity (not unique here)
+    # and valid_from/valid_to carry validity_params, so MetricFlow joins facts to the version valid AT metric_time
+    # (an as-of join it writes for you): revenue by customer__region = region at the time of the revenue.
+    semantic_model:
+      enabled: true
+    primary_entity: customer_version   # SCD2 models can't have a primary/unique entity column: name one instead
     config:
       access: public
       contract: {enforced: true}
@@ -23,27 +29,40 @@ models:
       - name: customer_key
         data_type: int64
         description: "Canonical (golden) key: one per real-world company across products."
+        entity: {type: natural, name: customer}
         data_tests: [not_null]
       - {name: customer_name, data_type: string, description: "Survivorship: RutaShip name, else RutaPay legal name."}
       - {name: tax_id_normalized, data_type: string}
       - {name: country, data_type: string}
-      - {name: region, data_type: string, description: "Region as of the version (SCD2)."}
+      - {name: region, data_type: string, description: "Region as of the version (SCD2).", dimension: {type: categorical}}
       - {name: current_region, data_type: string, description: "Type-6: today's region on every version."}
-      - {name: ship_tier, data_type: string}
-      - {name: plan_code, data_type: string}
-      - {name: subscription_status, data_type: string}
+      - {name: ship_tier, data_type: string, dimension: {type: categorical}}
+      - {name: plan_code, data_type: string, dimension: {type: categorical}}
+      - {name: subscription_status, data_type: string, dimension: {type: categorical}}
       - {name: shipper_id, data_type: int64}
       - {name: account_id, data_type: string}
       - {name: products, data_type: "array<string>"}
-      - {name: is_multi_product, data_type: bool}
+      - {name: is_multi_product, data_type: bool, dimension: {type: categorical}}
       - {name: match_rule, data_type: string}
       - {name: match_confidence, data_type: float64}
-      - {name: valid_from, data_type: timestamp}
-      - {name: valid_to, data_type: timestamp}
+      - {name: valid_from, data_type: datetime, granularity: day, dimension: {type: time, validity_params: {is_start: true}}}
+      - {name: valid_to, data_type: datetime, granularity: day, dimension: {type: time, validity_params: {is_end: true}}}
       - {name: is_current, data_type: bool}
 
   - name: fct_revenue
     description: "Grain: 1 row per revenue-bearing item across both products (Ship booking fees, Pay subscription/txn/freight fees). EUR at the month-average rate."
+    # SEMANTIC LAYER (decision 2A): the fact already applies the revenue rules (void + pass-through out, EUR at the
+    # month-average rate), so the metric is a plain sum. Both products are in one fact → total_revenue is SIMPLE.
+    semantic_model:
+      enabled: true
+    agg_time_dimension: revenue_date
+    metrics:
+      - name: total_revenue
+        label: Total revenue (EUR)
+        description: "Unified revenue across RutaShip (booking fees) and RutaPay (subscription, txn and freight fees), EUR."
+        type: simple
+        agg: sum
+        expr: amount_eur
     config:
       access: public
       contract: {enforced: true}
@@ -51,11 +70,13 @@ models:
     columns:
       - name: revenue_id
         data_type: string
+        entity: {type: primary, name: revenue_item}
         constraints: [{type: primary_key}]
         data_tests: [unique, not_null]
-      - {name: source_system, data_type: string}
+      - {name: source_system, data_type: string, dimension: {type: categorical}}
       - name: customer_key
         data_type: int64
+        entity: {type: foreign, name: customer}
         data_tests:
           - not_null
           - relationships:
@@ -64,11 +85,12 @@ models:
                 field: customer_key
       - name: revenue_type
         data_type: string
+        dimension: {type: categorical}
         data_tests:
           - accepted_values:
               arguments:
                 values: [subscription, txn_fee, freight_fee, booking_fee]   # pass_through must never appear
-      - {name: revenue_date, data_type: date}
+      - {name: revenue_date, data_type: date, granularity: day, dimension: {type: time}}
       - {name: currency, data_type: string}
       - {name: amount_local, data_type: numeric}
       - {name: plan_code, data_type: string}
@@ -81,6 +103,38 @@ models:
 
   - name: fct_customer_monthly
     description: "Grain: 1 row per customer per active month (periodic snapshot). mrr_eur is semi-additive."
+    # SEMANTIC LAYER: composite grain (customer × month) has no single-column key → declare a primary_entity name.
+    semantic_model:
+      enabled: true
+    primary_entity: customer_month
+    agg_time_dimension: activity_month
+    metrics:
+      - name: active_customers
+        description: "Distinct customers with revenue or shipments in the period."
+        type: simple
+        agg: count_distinct
+        expr: "case when is_active then customer_key end"
+      - name: mrr
+        label: MRR (EUR)
+        description: "Monthly recurring revenue. SEMI-ADDITIVE: sums across customers, but for a quarter/year it takes the LAST month, never the sum of months."
+        type: simple
+        agg: sum
+        expr: mrr_eur
+        non_additive_dimension: {name: activity_month, window_agg: max}
+      - name: subscribers
+        description: "Distinct customers paying a RutaPay subscription in the period."
+        type: simple
+        agg: count_distinct
+        expr: "case when is_subscriber then customer_key end"
+      - name: subscription_cancellations
+        type: simple
+        agg: count_distinct
+        expr: "case when is_subscription_cancelled then customer_key end"
+      - name: churned_customers
+        description: "Customers whose last activity in EITHER product falls in the period, then ≥ 90 days inactive."
+        type: simple
+        agg: count_distinct
+        expr: "case when is_customer_churned then customer_key end"
     config:
       access: public
       contract: {enforced: true}
@@ -90,18 +144,35 @@ models:
           arguments:
             combination_of_columns: [customer_key, month]
     columns:
-      - {name: customer_key, data_type: int64}
-      - {name: month, data_type: date}
+      - {name: customer_key, data_type: int64, entity: {type: foreign, name: customer}}
+      - {name: month, data_type: date, granularity: month, dimension: {type: time, name: activity_month}}   # `month` is a reserved MetricFlow name
       - {name: revenue_eur, data_type: numeric}
       - {name: mrr_eur, data_type: numeric}
       - {name: ship_revenue_eur, data_type: numeric}
       - {name: pay_revenue_eur, data_type: numeric}
       - {name: shipments, data_type: int64}
       - {name: gmv_eur, data_type: numeric}
-      - {name: is_multi_product_active, data_type: bool}
+      - {name: is_multi_product_active, data_type: bool, dimension: {type: categorical}}
+      - {name: is_active, data_type: bool}
+      - {name: is_subscriber, data_type: bool}
+      - {name: is_subscription_cancelled, data_type: bool}
+      - {name: is_customer_churned, data_type: bool}
 
   - name: fct_product_enrollment
     description: "Grain: 1 row per customer × product (factless coverage fact)."
+    semantic_model:
+      enabled: true
+    primary_entity: enrollment
+    agg_time_dimension: enrolled_at
+    metrics:
+      - name: pay_enrollments
+        description: "Customers enrolling in RutaPay (conversion target of ship_to_pay_conversion)."
+        type: simple
+        agg: count_distinct
+        expr: "case when pay_enrolled_at is not null then customer_key end"
+        # Not a metric `filter:` → metricflow 0.213 can't resolve metric filters inside a CONVERSION metric.
+        # Instead the event has its own time column, null for ship rows, so they never fall in the 90-day window.
+        agg_time_dimension: pay_enrolled_at
     config:
       access: public
       contract: {enforced: true}
@@ -111,7 +182,59 @@ models:
           arguments:
             combination_of_columns: [customer_key, product]
     columns:
-      - {name: customer_key, data_type: int64}
-      - {name: product, data_type: string}
+      - {name: customer_key, data_type: int64, entity: {type: foreign, name: customer}}
+      - {name: product, data_type: string, dimension: {type: categorical}}
       - {name: product_customer_id, data_type: string}
-      - {name: enrolled_at, data_type: timestamp}
+      - {name: enrolled_at, data_type: datetime, granularity: day, dimension: {type: time}}
+      - {name: pay_enrolled_at, data_type: datetime, granularity: day, dimension: {type: time}}
+
+  - name: fct_udl_shipments
+    description: "Grain: 1 row per non-cancelled RutaShip shipment, keyed to the canonical customer. EUR at the month-average rate."
+    config:
+      access: public
+      contract: {enforced: true}
+      meta: {classification: internal}
+    semantic_model:
+      enabled: true
+    agg_time_dimension: booked_at
+    metrics:
+      - {name: gmv, label: GMV (EUR), type: simple, agg: sum, expr: gmv_eur}
+      - {name: booking_fees, label: Booking fees (EUR), type: simple, agg: sum, expr: booking_fee_eur}
+      - {name: shipments, type: simple, agg: count, expr: "1"}
+      - {name: delivered_shipments, type: simple, agg: sum, expr: "cast(is_delivered as int64)"}
+      - {name: on_time_shipments, type: simple, agg: sum, expr: "cast(is_delivered and is_on_time as int64)"}
+      - name: first_bookings
+        description: "Customers booking their first shipment (base event of ship_to_pay_conversion)."
+        type: simple
+        agg: count_distinct
+        # Conversion inputs must be COUNT(1) / COUNT_DISTINCT (MetricFlow rewrites COUNT(col) as SUM(CASE…), rejected).
+        expr: "case when first_booked_at is not null then customer_key end"
+        agg_time_dimension: first_booked_at
+    columns:
+      - name: shipment_id
+        data_type: int64
+        entity: {type: primary, name: shipment}
+        constraints: [{type: primary_key}]
+        data_tests: [unique, not_null]
+      - name: customer_key
+        data_type: int64
+        entity: {type: foreign, name: customer}
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customer')
+                field: customer_key
+      - {name: carrier_id, data_type: int64, entity: {type: foreign, name: carrier}}
+      - {name: lane_id, data_type: int64, entity: {type: foreign, name: lane}}
+      - {name: status, data_type: string, dimension: {type: categorical}}
+      - {name: booked_at, data_type: datetime, granularity: day, dimension: {type: time}}
+      - {name: booked_date, data_type: date}
+      - {name: currency, data_type: string}
+      - name: gmv_eur
+        data_type: numeric
+        data_tests: [not_null]          # null = missing FX rate
+      - {name: booking_fee_eur, data_type: numeric}
+      - {name: is_delivered, data_type: bool}
+      - {name: is_on_time, data_type: bool}
+      - {name: first_booked_at, data_type: datetime, granularity: day, dimension: {type: time}}

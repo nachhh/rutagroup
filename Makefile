@@ -5,7 +5,7 @@ export
 export DBT_PROFILES_DIR := $(CURDIR)
 DBT := uv run dbt
 
-.PHONY: help up down data load load-pg load-bq deps ship udl debug clean day2 snapshot freshness govern pg-roles bq-governance replicate ontology eval-er
+.PHONY: help up down data load load-pg load-bq deps ship udl debug clean day2 snapshot freshness govern pg-roles bq-governance replicate ontology eval-er semantic mf
 
 help:            ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -47,6 +47,12 @@ replicate:       ## RutaShip PUBLIC marts (Postgres) → BigQuery ship_replica (
 	uv run python scripts/replicate_ship_to_bq.py
 ontology:        ## generate KG dbt models (kg_nodes, kg_edges) from ontology/ruta_ontology.yml
 	uv run python scripts/generate_kg_models.py
+semantic:        ## parse + validate the semantic layer (MetricFlow) and run the two saved queries
+	cd dbt/ruta_udl && $(DBT) parse -q && uv run mf validate-configs
+	cd dbt/ruta_udl && uv run mf query --saved-query multi_product_revenue_by_region --order metric_time__quarter
+	cd dbt/ruta_udl && uv run mf query --saved-query churn_by_segment --order metric_time__quarter
+mf:              ## ad-hoc MetricFlow query, e.g. make mf Q="--metrics total_revenue --group-by customer__region"
+	cd dbt/ruta_udl && $(DBT) parse -q && uv run mf query $(Q)
 eval-er:         ## score entity resolution against the generator's ground truth (precision / recall)
 	uv run python scripts/eval_entity_resolution.py
 pg-roles:        ## create least-privilege roles in Postgres (analyst, pii_reader, pii_reader_iberia)

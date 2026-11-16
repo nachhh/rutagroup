@@ -1,0 +1,21 @@
+version: 2
+
+# Saved queries: named, versioned metric requests (the "golden questions"). Exports can materialize them as tables
+# (dbt Cloud runs exports; locally we run them with `mf query --saved-query`).
+saved_queries:
+  - name: multi_product_revenue_by_region
+    description: "The roadmap's business question: revenue and churn by multi-product flag, region and quarter."
+    query_params:
+      metrics: [total_revenue, active_customers, revenue_per_customer, customer_churn_rate]
+      group_by:
+        - "Dimension('customer__is_multi_product')"
+        - "Dimension('customer__region')"
+        - "TimeDimension('metric_time', 'quarter')"
+
+  - name: churn_by_segment
+    description: "Both churn definitions side by side, by multi-product flag and plan."
+    query_params:
+      metrics: [subscription_churn_rate, customer_churn_rate]
+      group_by:
+        - "Dimension('customer__is_multi_product')"
+        - "TimeDimension('metric_time', 'quarter')"
