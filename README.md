@@ -69,12 +69,15 @@ make mf Q="--metrics take_rate --group-by metric_time__year --explain"   # read 
 # 9. NL agent over MCP (Phase 6). Needs ANTHROPIC_API_KEY in .env (Claude Haiku 5.5, ~$0.003 per question)
 make ask Q="Do customers using both products churn less? Break it down by region"
 make ask Q="Which carriers move the most freight for the client Grupo Cuevas, and its 2025 revenue?"
+
+# 10. Orchestration + end-to-end lineage (Phase 7). Airflow lives in its own venv
+make airflow-install   # airflow/.venv, Airflow 3.1 + constraints
+make airflow-test      # one full in-process run of both DAGs (ruta_pipeline → Asset → ruta_semantic_checks)
+make airflow-up        # UI at http://localhost:8080: Graph, Assets, logs
+make lineage           # docs/diagrams/end-to-end-lineage.md, generated from both manifests
 ```
 
-Coming in later phases (targets are added as each phase lands):
-
 ```bash
-make all         # whole pipeline end-to-end (same steps as the Airflow DAG, Phase 7)
 make down        # stop Postgres (data persists in the Docker volume)
 ```
 
@@ -139,6 +142,7 @@ Full Mermaid diagrams are in [docs/diagrams/](docs/diagrams/):
 [entity resolution](docs/diagrams/entity-resolution.md) ·
 [dbt lineage](docs/diagrams/dbt-lineage.md) ·
 [semantic layer](docs/diagrams/semantic-layer.md) ·
+[end-to-end lineage](docs/diagrams/end-to-end-lineage.md) ·
 [NL agent sequence](docs/diagrams/nl-agent-sequence.md)
 
 **Why two dbt projects?** A dbt invocation targets one adapter. RutaShip on Postgres

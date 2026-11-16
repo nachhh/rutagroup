@@ -134,3 +134,20 @@ Grows phase by phase. Format: **English** · *Español*: one-line definition.
 | Tool calling (function calling) | Llamada a herramientas | The LLM returns a structured call; the app executes it and feeds the result back |
 | Guardrail | Barandilla / salvaguarda | A server-enforced limit on what an agent can do (allowlist, read-only, row cap) |
 | Golden question set (eval) | Conjunto de preguntas de referencia | Questions with the expected metric query, used to test an agent |
+| DAG (Airflow) | DAG / grafo acíclico dirigido | A workflow: tasks plus their dependencies, with a schedule |
+| Operator / task | Operador / tarea | A task template (BashOperator…) / one node of the DAG run |
+| TaskGroup | Grupo de tareas | Visual and logical grouping of tasks inside a DAG |
+| Asset (ex-Dataset) | Activo de datos | Airflow 3 logical data product; `outlets` update it, `schedule=[asset]` reacts to it |
+| Data-aware scheduling | Planificación por datos | Run a DAG when its input data is updated, not at a clock time |
+| Idempotent task | Tarea idempotente | Running it twice gives the same result: safe retries and backfills |
+| Backfill / catchup | Reproceso histórico | Running past intervals of a schedule |
+| Astronomer Cosmos | Cosmos | Library that renders each dbt model/test as an Airflow task |
+| OpenLineage | OpenLineage | Open standard for lineage events (job run + input/output datasets) |
+| Marquez | Marquez | Reference OpenLineage server and lineage UI |
+| UNLOAD (Redshift) | UNLOAD | Export a query result from Redshift to S3 (e.g. Parquet) |
+| Storage Transfer Service | Servicio de transferencia de almacenamiento | GCP managed copy from S3 (and others) to GCS |
+| BigQuery Data Transfer Service | Servicio de transferencia de datos de BQ | Managed connectors into BQ, incl. a Redshift migration connector |
+| BigQuery Omni / BigLake | BigQuery Omni / BigLake | Query data in AWS/Azure object storage in place / governed external tables |
+| DISTKEY / SORTKEY | Clave de distribución / de orden | Redshift physical design: node co-location and block pruning |
+| SUPER (Redshift) | SUPER | Redshift semi-structured type, queried with PartiQL |
+| RPU | Unidad de procesamiento de Redshift | Redshift Serverless compute/billing unit |
