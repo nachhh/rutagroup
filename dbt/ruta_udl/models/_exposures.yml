@@ -26,6 +26,8 @@ exposures:
       - ref('dim_customer')
       - ref('fct_revenue')
       - ref('fct_customer_monthly')
+      - ref('fct_udl_shipments')
+      - ref('fct_product_enrollment')
       - ref('fct_payments')
       - ref('dim_date')
       - ref('kg_nodes')

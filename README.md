@@ -7,7 +7,7 @@ combining BigQuery with Redshift**, built on a small made-up multi-product compa
 How the project is run:
 - **Spec-driven.** Each phase has a spec in [specs/](specs/).
 - **Checkpoints and quizzes.** Phases include 🧭 decision checkpoints and 🧠 quizzes.
-- **Docs.** Concept notes are in [docs/](docs/), diagrams in [docs/diagrams/](docs/diagrams/), and a bilingual
+- **Docs.** Command cheat sheet: [docs/dbt_commands.md](docs/dbt_commands.md). Concept notes are in [docs/](docs/), diagrams in [docs/diagrams/](docs/diagrams/), and a bilingual
   [glossary](docs/glossary.md).
 - **Time budget.** Two sessions of 3–4 h each.
 
@@ -60,12 +60,16 @@ make day2           # optional: simulate day-2 source changes, then `make snapsh
 make replicate      # RutaShip public marts → BigQuery ship_replica (then `make udl`)
 make ontology       # regenerate kg_nodes / kg_edges dbt models from ontology/ruta_ontology.yml
 make eval-er        # entity-resolution precision / recall vs the generator's ground truth
+
+# 8. Semantic layer / MetricFlow (Phase 5)
+make semantic       # validate the semantic layer + run the saved queries (the business question)
+make mf Q="--metrics total_revenue,customer_churn_rate --group-by customer__is_multi_product,metric_time__quarter"
+make mf Q="--metrics take_rate --group-by metric_time__year --explain"   # read the SQL MetricFlow writes
 ```
 
 Coming in later phases (targets are added as each phase lands):
 
 ```bash
-make mf Q="..."  # Phase 5: MetricFlow queries, e.g. --metrics total_revenue --group-by customer__region
 make ask Q="..." # Phase 6: natural-language question → MCP → semantic layer
 make all         # whole pipeline end-to-end (same steps as the Airflow DAG, Phase 7)
 make down        # stop Postgres (data persists in the Docker volume)
@@ -131,6 +135,7 @@ Full Mermaid diagrams are in [docs/diagrams/](docs/diagrams/):
 [ontology](docs/diagrams/ontology.md) ·
 [entity resolution](docs/diagrams/entity-resolution.md) ·
 [dbt lineage](docs/diagrams/dbt-lineage.md) ·
+[semantic layer](docs/diagrams/semantic-layer.md) ·
 [NL agent sequence](docs/diagrams/nl-agent-sequence.md)
 
 **Why two dbt projects?** A dbt invocation targets one adapter. RutaShip on Postgres
@@ -142,6 +147,21 @@ pattern. In dbt Cloud, cross-project `ref` handles this.
 (SCD2 the dbt way) and an incremental `merge`. BigQuery gets SCD2 **derived from a change log** with
 window functions, plus an incremental `insert_overwrite` on a date-partitioned table, the
 classic BQ cost pattern. Two approaches to each problem, each with trade-offs worth discussing.
+
+### Layers workflow: how one question flows through the layers
+
+```
+"ACME revenue last Q + carriers"
+        │  context layer (MCP): ontology + metric catalog + governance
+        ▼
+  ontology: ACME → Customer; "revenue" → metric; "carriers" → path books/carries
+        ├──► semantic layer ──► revenue(customer=ACME, grain=quarter) ──► UDL fct_revenue
+        └──► knowledge graph ──► customer:ACME –books→ shipment ←carries– carrier
+```
+
+**UDL = the data · semantic layer = the math · ontology = the dictionary · KG = the map · context layer = the
+agent's briefing.** The semantic layer (metric questions) and the knowledge graph (relationship questions) are
+parallel tools, both built on the UDL. Details: [docs/04](docs/04_udl_ontology.md) · [docs/05](docs/05_semantic_layer.md).
 
 ---
 
@@ -173,7 +193,7 @@ Total ≈ 7.75 h. That is the top of the budget. If we run behind, cut in this o
 - [x] Phase 2: dbt refresher
 - [x] Phase 3: Governance → code
 - [x] Phase 4: UDL / ontology / KG
-- [ ] Phase 5: Semantic Layer / MetricFlow
+- [x] Phase 5: Semantic Layer / MetricFlow
 - [ ] Phase 6: NL + MCP agent
 - [ ] Phase 7: BigQuery + Redshift + Airflow
 - [ ] Phase 8: Wrap-up

@@ -114,3 +114,16 @@ Grows phase by phase. Format: **English** · *Español*: one-line definition.
 | Property graph | Grafo de propiedades | Nodes and edges carrying key-value properties (Neo4j, GQL, Spanner Graph) |
 | GQL | GQL | ISO standard graph query language (`MATCH (a)-[:rel]->(b)`) |
 | Replication (UNLOAD → S3 → GCS) | Replicación | Redshift exports Parquet to S3, transfer to GCS, BigQuery loads it |
+| Semantic model | Modelo semántico | Metadata on one dbt model: entities, dimensions, metrics (MetricFlow) |
+| Entity (primary / foreign / natural) | Entidad | A semantic model's join key; natural = non-unique key of an SCD2 model |
+| `metric_time` | Tiempo de la métrica | MetricFlow's shared time axis; each metric maps its own date to it |
+| `agg_time_dimension` | Dimensión temporal de agregación | The date a metric is aggregated on by default |
+| Time spine | Calendario base (time spine) | One row per day; used for cumulative windows, offsets and gap filling |
+| Simple / ratio / derived / cumulative / conversion metric | Tipos de métrica | The five MetricFlow metric types (conversion = funnel within a window) |
+| Semi-additive measure | Medida semiaditiva | Sums across some dimensions but not time (MRR, balances): take the last snapshot |
+| Fan-out | Multiplicación de filas (fan-out) | A one-to-many join that duplicates rows and inflates sums |
+| Saved query / export | Consulta guardada / exportación | A named metric request; an export materializes it as a table |
+| Headless BI | BI sin interfaz (headless) | Metrics served as an API, independent of any front end |
+| Open Semantic Interchange (OSI) | OSI | Industry effort for one portable semantic-layer spec |
+| Right-censoring | Censura por la derecha | Recent periods can't be judged yet (e.g. churn needs 90 days of future) |
+| Left-censoring | Censura por la izquierda | History starts mid-stream: the first observed event isn't the true first |

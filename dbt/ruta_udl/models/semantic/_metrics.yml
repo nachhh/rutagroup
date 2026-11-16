@@ -1,0 +1,66 @@
+version: 2
+
+# Cross-model metrics (latest spec: anything combining metrics from different semantic models lives here, top-level).
+# Simple metrics live next to their model in marts/udl/_udl.yml. One example per metric type.
+
+metrics:
+  # ---- RATIO: aggregate numerator and denominator separately, THEN divide (never avg of per-row ratios).
+  - name: take_rate
+    label: Take rate
+    description: "Booking fees / GMV: how much of the freight value RutaShip keeps."
+    type: ratio
+    numerator: booking_fees
+    denominator: gmv
+
+  - name: on_time_delivery_rate
+    type: ratio
+    numerator: on_time_shipments
+    denominator: delivered_shipments
+
+  # ---- CHURN (decision 3C): two NAMED definitions, never a bare "churn".
+  - name: subscription_churn_rate
+    description: "RutaPay view: subscription cancellations in the period / subscribers in the period."
+    type: ratio
+    numerator: subscription_cancellations
+    denominator: subscribers
+
+  - name: customer_churn_rate
+    description: "UDL view: customers whose last activity in EITHER product is in the period and who then stay inactive ≥ 90 days / active customers in the period."
+    type: ratio
+    numerator: churned_customers
+    denominator: active_customers
+
+  # ---- DERIVED: an expression over other metrics (here across two semantic models).
+  - name: revenue_per_customer
+    label: Revenue per active customer (EUR)
+    type: derived
+    expr: total_revenue / nullif(active_customers, 0)
+    input_metrics: [total_revenue, active_customers]
+
+  # ---- DERIVED with an OFFSET: the same metric shifted in time (period-over-period). Needs the time spine.
+  - name: revenue_qoq_growth
+    label: Revenue growth vs previous quarter
+    description: "Query at metric_time__quarter."
+    type: derived
+    expr: (total_revenue - revenue_prev_quarter) / nullif(revenue_prev_quarter, 0)
+    input_metrics:
+      - name: total_revenue
+      - name: total_revenue
+        alias: revenue_prev_quarter
+        offset_window: 1 quarter
+
+  # ---- CUMULATIVE: a rolling window over the time spine.
+  - name: trailing_90d_revenue
+    type: cumulative
+    input_metric: total_revenue
+    window: 90 days
+
+  # ---- CONVERSION: per entity, base event → conversion event within a window (a funnel, not FX conversion!).
+  - name: ship_to_pay_conversion
+    description: "Share of customers who enroll in RutaPay within 90 days of their FIRST RutaShip booking (cross-sell funnel)."
+    type: conversion
+    entity: customer
+    calculation: conversion_rate
+    base_metric: first_bookings
+    conversion_metric: pay_enrollments
+    window: 90 days
