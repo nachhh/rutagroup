@@ -5,7 +5,7 @@ export
 export DBT_PROFILES_DIR := $(CURDIR)
 DBT := uv run dbt
 
-.PHONY: help up down data load load-pg load-bq deps ship udl debug clean day2 snapshot freshness govern pg-roles bq-governance replicate ontology eval-er semantic mf
+.PHONY: help up down data load load-pg load-bq deps ship udl debug clean day2 snapshot freshness govern pg-roles bq-governance replicate ontology eval-er semantic mf ask
 
 help:            ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -53,6 +53,9 @@ semantic:        ## parse + validate the semantic layer (MetricFlow) and run the
 	cd dbt/ruta_udl && uv run mf query --saved-query churn_by_segment --order metric_time__quarter
 mf:              ## ad-hoc MetricFlow query, e.g. make mf Q="--metrics total_revenue --group-by customer__region"
 	cd dbt/ruta_udl && $(DBT) parse -q && uv run mf query $(Q)
+ask:             ## NL question -> agent -> MCP server -> semantic layer / KG, e.g. make ask Q="Do multi-product customers churn less?"
+	cd dbt/ruta_udl && $(DBT) parse -q
+	uv run python agent/ask.py "$(Q)"
 eval-er:         ## score entity resolution against the generator's ground truth (precision / recall)
 	uv run python scripts/eval_entity_resolution.py
 pg-roles:        ## create least-privilege roles in Postgres (analyst, pii_reader, pii_reader_iberia)

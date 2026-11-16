@@ -106,3 +106,21 @@ to *join* them for aggregation.
 - **Open Semantic Interchange (OSI)**: an industry effort (Snowflake, dbt Labs, Salesforce and others) to make one
   semantic spec portable across tools. dbt 1.12 already writes `target/osi_document.json` and warns about what OSI
   can't express yet (natural/SCD entities, cumulative windows, conversion metrics).
+
+## 8. Consumers: the NL agent over MCP (Phase 6)
+
+`make ask Q="..."` → [agent/ask.py](../agent/ask.py) (Claude Haiku 5.5) → MCP over stdio →
+[mcp_server/metrics_server.py](../mcp_server/metrics_server.py) → `mf query` / the KG tables.
+
+- **Text-to-SQL vs text-to-metric-query:** the LLM never sees tables or SQL; it picks `metrics / group_by / where`
+  from the catalog and MetricFlow compiles the query. Same question → same SQL → same number as BI.
+- **Context layer** = tool descriptions + metric descriptions + ontology synonyms + rules in the system prompt
+  (closed periods, two churns, "revenue" = `total_revenue`).
+- **Guardrails in the server, not the prompt:** metric allowlist from `semantic_manifest.json`, allowlisted KG
+  predicates, parameterized SQL, row cap, 1 GB bytes cap, and the exact `mf` command returned for audit.
+- **Observed:** when a tool description was missing a fact (how to filter one customer), the agent **refused to guess**;
+  fixing the tool description (context, not code) fixed the answer.
+- **KG ↔ semantic-layer bridge:** each ontology class declares `semantic: {entity: customer}` (or a dimension).
+  `find_entity` turns a KG node into a ready metric filter (`{{ Entity('customer') }} = <key>`), and `make govern`
+  rule R7 fails CI if the link stops resolving. The link is declared once and checked, not buried in a prompt.
+

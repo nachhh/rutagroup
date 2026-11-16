@@ -7,6 +7,9 @@
 #   3. CODE GENERATION of the knowledge graph: `make ontology` renders dbt models kg_nodes / kg_edges from the
 #      `nodes:` / `edges:` blocks below (scripts/generate_kg_models.py). Change the meaning here, not in SQL.
 #   4. A governance check: every class must map to a PUBLIC model (or a seed) → `make govern` rule R6.
+#   5. The BRIDGE to the semantic layer: `semantic: {entity: customer}` says "a KG node customer:<id> is the
+#      semantic-layer entity `customer` with key <id>" (or `{dimension: customer__region}` for classes that are
+#      dimensions there). The MCP server derives metric filters from it; `make govern` rule R7 checks it exists.
 #
 # `maps_to` = the governed data product that implements the class ("<project>.<model>").
 # `nodes.from` / `edges.from` = SQL FROM clause (dbt Jinja allowed) used to materialize instances in the KG.
@@ -20,6 +23,7 @@ classes:
     synonyms: [client, account, shipper, merchant, cliente, cuenta, empresa]
     maps_to: ruta_udl.dim_customer
     identifier: customer_key
+    semantic: {entity: customer}   # explicit link to the semantic layer (R7)
     nodes:
       from: "{{ ref('dim_customer') }} where is_current"
       id: customer_key
@@ -31,6 +35,7 @@ classes:
     synonyms: [load, booking, shipment, envío, carga]
     maps_to: ruta_ship.fct_shipments
     identifier: shipment_id
+    semantic: {entity: shipment}   # explicit link to the semantic layer (R7)
     nodes:
       from: "{{ ref('stg_ship__shipments') }}"
       id: shipment_id
@@ -42,6 +47,7 @@ classes:
     synonyms: [transporter, trucking company, transportista]
     maps_to: ruta_ship.dim_carrier
     identifier: carrier_id
+    semantic: {entity: carrier}   # explicit link to the semantic layer (R7)
     nodes:
       from: "{{ source('ship_replica', 'dim_carrier') }}"
       id: carrier_id
@@ -53,6 +59,7 @@ classes:
     synonyms: [route, corridor, ruta]
     maps_to: ruta_ship.dim_lane
     identifier: lane_id
+    semantic: {entity: lane}   # explicit link to the semantic layer (R7)
     nodes:
       from: "{{ source('ship_replica', 'dim_lane') }}"
       id: lane_id
@@ -64,6 +71,7 @@ classes:
     synonyms: [territory, market, región, zona]
     maps_to: ruta_udl.seed_region_map
     identifier: region
+    semantic: {dimension: customer__region}   # explicit link to the semantic layer (R7)
     nodes:
       from: "(select distinct region from {{ ref('seed_region_map') }})"
       id: region
@@ -97,6 +105,7 @@ classes:
     synonyms: [tier, subscription, package, plan]
     maps_to: ruta_udl.seed_plans
     identifier: plan_code
+    semantic: {dimension: customer__plan_code}   # explicit link to the semantic layer (R7)
     nodes:
       from: "{{ ref('seed_plans') }}"
       id: plan_code

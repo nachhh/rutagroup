@@ -20,16 +20,28 @@ is documented in code comments only, with no extra docs or quiz for it.
 ## Files
 | File | Content |
 |---|---|
-| `mcp/metrics_server.py` | `FastMCP` server (python `mcp` SDK). Tools: `list_metrics()`, `list_dimensions(metrics)`, `query_metrics(metrics, group_by, where, order_by, limit)` → subprocess `mf query ... --csv`. Resource: `ontology://ruta` (synonyms). Validates names against `semantic_manifest.json` |
-| `agent/ask.py` | ~80 lines. MCP client (stdio) → passes tools to the LLM → tool-call loop → prints the answer + the metric query used. **Gemini free tier** (`google-genai`) or **Claude Haiku** (Anthropic SDK). Decided at the checkpoint |
+| `mcp_server/metrics_server.py` | `MCPServer` (python `mcp` SDK 2.x; was `FastMCP` in 1.x). Folder renamed from `mcp/` so it can't shadow the `mcp` package. Semantic-layer tools: `list_metrics()`, `list_dimensions(metrics)`, `list_entities(metrics)`, `query_metrics(metrics, group_by, where, order_by, start_time, end_time, limit)` → subprocess `mf query ... --csv`. Vocabulary: `get_ontology()` (a tool, not a resource, because plain tool-calling LLMs only see tools). KG (added): `find_entity(name, node_type)`, `kg_related(node_id, path)` over `udl_kg.kg_nodes/kg_edges` with parameterized SQL and allowlisted predicates. Validates metric names against `semantic_manifest.json` |
+| `agent/ask.py` | ~80 lines. MCP client (stdio) → passes tools to the LLM → tool-call loop → prints the answer + the metric query used. **Claude Haiku 5.5** (`claude-haiku-5-5`, Anthropic SDK), decided at the checkpoint |
 
 ## Acceptance criteria
 - `uv run agent/ask.py "Do customers using both products churn less? Break it down by region"` returns
-  an answer that calls `query_metrics` with `churn_rate` grouped by `customer__is_multi_product, customer__region`
+  an answer that calls `query_metrics` with `customer_churn_rate` (+ `subscription_churn_rate`) grouped by `customer__is_multi_product, customer__region`
 - An ambiguous question ("how are clients doing?") resolves "clients" → Customer via ontology synonyms
 - Unknown metric names are rejected by the server (a guardrail)
 
-## 🧭 Checkpoint
-Gemini vs Haiku. Claude will estimate the token cost per question before you choose.
+## 🧭 Checkpoint: done
+Claude Haiku 5.5 chosen: $0.10 / $0.50 per M tokens; a question uses ~4-6 tool round-trips, ≈ $0.003-0.005.
 
-## 🧠 Quiz 6: 4 questions on concepts only (text-to-SQL vs text-to-metric, context layer, MCP role, guardrails/evals)
+## Status log (2026-11-15)
+- `make ask` on the business question: 4 tool calls, both churn metrics labelled, 2025 (closed period), caveats on
+  small cells and selection bias, audit `mf` commands printed. ✅
+- Relationship question (carriers for a customer + its revenue): `find_entity → kg_related → query_metrics` with
+  `{{ Entity('customer') }} = <key>`. First run the agent **refused to guess** (no customer filter known); fixed by
+  improving tool descriptions only. ✅
+- Unknown metric (`churn`) and non-ontology KG predicates are rejected by the server. ✅
+- **KG ↔ semantic-layer bridge made explicit:** ontology classes carry `semantic: {entity: customer}` /
+  `{dimension: customer__region}`; `find_entity` returns a ready `metric_filter` derived from it; `make govern` rule
+  **R7** fails if a link doesn't resolve in `semantic_manifest.json` (tested with a typo). Replaced the docstring hint.
+- Phase-6 note: user asked for a 2-question concepts quiz (overrides "no quiz" for this phase).
+
+## 🧠 Quiz 6: 2 questions (time-boxed): text-to-SQL vs text-to-metric-query; guardrails/evals
