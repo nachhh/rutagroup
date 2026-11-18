@@ -27,8 +27,9 @@ flowchart LR
   src_lanes[(raw_ship.lanes)] --> stg_lanes[stg_ship__lanes]:::view --> dim_lane[dim_lane]:::table
 
   stg_events --> rollup[int_shipment_event_rollup]:::eph
-  stg_shipments --> fct_shipments[fct_shipments<br/>merge · 3d lookback]:::inc
+  stg_shipments --> fct_shipments[fct_shipments<br/>merge · 3d lookback on shipments + events]:::inc
   rollup --> fct_shipments
+  stg_events -. "incremental filter (depends_on)" .-> fct_shipments
   stg_events --> fct_events[fct_shipment_events<br/>append · event_id watermark]:::inc
   stg_shipments --> lifecycle[fct_shipment_lifecycle<br/>accumulating snapshot]:::table
   rollup --> lifecycle
