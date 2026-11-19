@@ -2,33 +2,22 @@
   grain: 1 row per SOURCE RECORD (shipper or account) → its canonical customer_key. The CROSSWALK of the UDL:
   facts keep their source ids and get customer_key from here.
 
-  customer_key = FARM_FINGERPRINT of a deterministic anchor: the Pay account if any, else the shipper.
-  ⚠️ Key stability: if a ship-only customer later matches an account, its anchor (and key) changes. Production fix:
-     a persisted KEY REGISTRY (incremental table that assigns a key once and never reissues it; merges keep the
-     surviving key and record the retired one).
+  customer_key comes from the persisted KEY REGISTRY (int_customer_key_registry), not from a hash computed on the
+  fly: matching (int_customer_clusters) is recomputed every run, keys are assigned once and survive re-matching.
+  Merges retire keys into customer_key_aliases so consumers holding an old key can resolve it.
 -#}
-with m as (select * from {{ ref('int_customer_matches') }}),
-c as (select * from {{ ref('int_customer_candidates') }}),
-
-ship as (
-    select c.source_system, c.source_id, coalesce(concat('pay:', m.account_id), concat('ship:', c.source_id)) as anchor,
-           coalesce(m.match_rule, 'unmatched') as match_rule, coalesce(m.confidence, 1.0) as confidence, m.decided_by
-    from c left join m on m.shipper_id = c.source_id
-    where c.source_system = 'ship'
-),
-
-pay as (
-    select c.source_system, c.source_id, concat('pay:', c.source_id) as anchor,
-           coalesce(m.match_rule, 'unmatched'), coalesce(m.confidence, 1.0), m.decided_by
-    from c left join m on m.account_id = c.source_id
-    where c.source_system = 'pay'
+with registry_current as (
+    select source_system, source_id, customer_key
+    from {{ ref('int_customer_key_registry') }}
+    qualify row_number() over (partition by source_system, source_id order by assigned_at desc) = 1
 )
 
 select
-    farm_fingerprint(anchor)  as customer_key,
-    source_system,
-    source_id,
-    match_rule,
-    confidence,
-    decided_by
-from (select * from ship union all select * from pay)
+    r.customer_key,
+    c.source_system,
+    c.source_id,
+    c.match_rule,
+    c.confidence,
+    c.decided_by
+from {{ ref('int_customer_clusters') }} c
+join registry_current r using (source_system, source_id)   -- the registry ran first, so every present record has a key

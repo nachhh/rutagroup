@@ -14,7 +14,8 @@ Turn two product-centric models into one entity-centric layer, and make its mean
    - Blocking key: normalized tax_id prefix / email domain
    - Rules, in priority order: exact normalized `tax_id` (conf 1.0) → corporate email domain + name
      similarity (`EDIT_DISTANCE` on normalized names, conf 0.8) → name-only (conf 0.5, review queue)
-   - Output: `customer_key` (`FARM_FINGERPRINT` of the winning cluster), `source_system`, `source_id`,
+   - Output: `customer_key` (`FARM_FINGERPRINT` of the winning cluster; persisted in a key registry since
+     [Phase 7s2](phase-7s2-extras.md)), `source_system`, `source_id`,
      `match_rule`, `confidence`
    - `int_customer_review_queue` holds ambiguous matches (a stewardship workflow, which is also a governance point)
 4. **Conformed marts**: `dim_customer` (SCD2, `is_multi_product`, `products ARRAY<STRING>`),

@@ -102,6 +102,11 @@ Grows phase by phase. Format: **English** · *Español*: one-line definition.
 | MDM (Master Data Management) | Gestión de datos maestros | Discipline and tooling to maintain golden records operationally |
 | Data stewardship | Custodia de datos | Humans accountable for resolving ambiguous data (e.g. the match review queue) |
 | Key registry | Registro de claves | Persisted table that assigns canonical keys once and never reissues them |
+| Survivor rule (key) | Regla de clave superviviente | Which key a merged customer keeps (here: the oldest); the other is retired |
+| Key alias (retired key) | Alias de clave (clave retirada) | Mapping from a key retired by a merge to the key that replaced it |
+| Tombstone | Lápida (tombstone) | A record kept (or marked) after deletion so references to it still resolve |
+| Identity graph | Grafo de identidad | Identifiers (tax id, email hash, source ids) linked to the canonical entity they belong to |
+| Unit test (dbt) | Test unitario (dbt) | Mocked-input test of one model's SQL logic; can mock `this` and `is_incremental()` |
 | Precision / recall | Precisión / exhaustividad | Correct merges / all merges · correct merges / all true pairs |
 | Timeline merge (SCD2) | Fusión de líneas de tiempo | Combining several SCD2 histories by unioning their change points into new intervals |
 | Pass-through revenue | Ingreso de paso | Money collected on behalf of a third party (freight for carriers): not revenue |

@@ -28,8 +28,30 @@ models:
         data_tests: [unique, not_null]
   - name: int_customer_review_queue
     description: "Grain: 1 row per undecided ambiguous pair, for data stewards."
+  - name: int_customer_clusters
+    description: "Grain: 1 row per source record → today's match cluster (cluster_id = anchor). Stateless, no key."
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, source_id]
+  - name: int_customer_key_registry
+    description: >
+      Grain: 1 row per (source record, key assignment). Append-only log, full_refresh=false: the only state in
+      entity resolution. Current key = latest row per record. Rules: keep, inherit, merge (oldest key wins), split, new.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source_system, source_id, assigned_at]
+    columns:
+      - name: customer_key
+        data_tests: [not_null]
+      - name: reason
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [migrated, new, inherit, merge, split]
   - name: int_customer_xwalk
-    description: "Grain: 1 row per source record → canonical customer_key. The crosswalk of the UDL."
+    description: "Grain: 1 row per source record → canonical customer_key (read from the key registry). The crosswalk of the UDL."
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -63,3 +85,49 @@ unit_tests:
         - {shipper_id: "2", account_id: a2, match_rule: domain_and_name, routing: review_conflict, tax_conflict: true}
         - {shipper_id: "3", account_id: a3, match_rule: email_exact, routing: auto_merge, tax_conflict: false}
         - {shipper_id: "4", account_id: a4, match_rule: name_only, routing: review, tax_conflict: false}
+
+  # The key registry is an INCREMENTAL model whose logic only runs when is_incremental() is true: mock `this` (the
+  # existing log) and override the macro. Scenarios use clusters that already own keys, so no key is minted
+  # (minted keys are salted with invocation_id and can't be predicted in a fixture).
+  - name: test_key_registry_keep_inherit_merge
+    description: >
+      s1 keeps K100 (no row). a2 joins s1's cluster → inherit K100. s3 (K300, older) and a3 (K301) now share a
+      cluster → oldest key wins: a3 moves to K300 (merge); s3 keeps K300 (no row).
+    model: int_customer_key_registry
+    overrides:
+      macros: {is_incremental: true}
+    given:
+      - input: ref('int_customer_clusters')
+        rows:
+          - {source_system: ship, source_id: s1, cluster_id: "pay:a2"}
+          - {source_system: pay,  source_id: a2, cluster_id: "pay:a2"}
+          - {source_system: ship, source_id: s3, cluster_id: "pay:a3"}
+          - {source_system: pay,  source_id: a3, cluster_id: "pay:a3"}
+      - input: this
+        rows:
+          - {source_system: ship, source_id: s1, customer_key: 100, assigned_at: "2026-01-01 00:00:00"}
+          - {source_system: ship, source_id: s3, customer_key: 300, assigned_at: "2026-01-01 00:00:00"}
+          - {source_system: pay,  source_id: a3, customer_key: 301, assigned_at: "2026-02-01 00:00:00"}
+    expect:
+      rows:
+        - {source_system: pay, source_id: a2, customer_key: 100, reason: inherit, previous_key: null}
+        - {source_system: pay, source_id: a3, customer_key: 300, reason: merge,   previous_key: 301}
+  - name: test_key_registry_split
+    description: >
+      s5 and a5 shared K500; a steward split them. The key stays with the side that held it longest (s5, since
+      January) → no row for s5; a5 gets a new key (reason split). customer_key is not compared: it is minted.
+    model: int_customer_key_registry
+    overrides:
+      macros: {is_incremental: true}
+    given:
+      - input: ref('int_customer_clusters')
+        rows:
+          - {source_system: ship, source_id: s5, cluster_id: "ship:s5"}
+          - {source_system: pay,  source_id: a5, cluster_id: "pay:a5"}
+      - input: this
+        rows:
+          - {source_system: ship, source_id: s5, customer_key: 500, assigned_at: "2026-01-01 00:00:00"}
+          - {source_system: pay,  source_id: a5, customer_key: 500, assigned_at: "2026-03-01 00:00:00"}
+    expect:
+      rows:
+        - {source_system: pay, source_id: a5, reason: split, previous_key: 500}

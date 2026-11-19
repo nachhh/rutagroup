@@ -40,6 +40,8 @@ freshness:       ## source freshness checks, both projects
 day2:            ## simulate day-2 changes in RutaShip source (incrementals, snapshot, late data)
 	uv run python scripts/day2_ship.py
 udl:             ## dbt build UDL (BigQuery)
+# bootstrap: unit tests that mock `this` need the key registry to EXIST (no-op once it does)
+	cd dbt/ruta_udl && $(DBT) run --empty -q -s int_customer_key_registry
 	cd dbt/ruta_udl && $(DBT) build
 
 replicate:       ## RutaShip PUBLIC marts (Postgres) → BigQuery ship_replica (simulated UNLOAD → S3 → GCS → BQ)

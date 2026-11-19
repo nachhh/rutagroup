@@ -44,7 +44,10 @@ ruta_ship public marts ──replicate──▶ ship_replica ──▶ stg_ship_
 | Veto → score → route | `int_customer_pairs` | **Veto first:** two present, different tax ids → `review_conflict`. Then the best rule: tax id 1.0 · email 0.95 · domain+name 0.8 · name only 0.5. ≥ 0.8 auto-merge |
 | Decide | `int_customer_matches` | Auto-merges + steward `match`, minus steward `no_match`; mutual-best 1:1 |
 | Steward | `int_customer_review_queue` + `seed_match_decisions.csv` | Stewardship as code: decisions are reviewed PRs with reviewer and date |
-| Crosswalk | `int_customer_xwalk` | Every source record → `customer_key` (FARM_FINGERPRINT of an anchor) |
+| Cluster | `int_customer_clusters` | Every source record → today's match cluster (`cluster_id` = anchor). Stateless |
+| Key registry | `int_customer_key_registry` | Append-only log of key assignments (`full_refresh: false`): the only state. Phase 7s2 |
+| Crosswalk | `int_customer_xwalk` | Every source record → `customer_key` (current key from the registry) |
+| Aliases | `customer_key_aliases` | Public: retired key → today's key, for consumers that stored a key before a merge |
 
 **Results vs ground truth** (`make eval-er`): precision **1.000**, recall **0.974** (F1 0.987). No decoy merged.
 All 15 missed pairs sit in the review queue (a tax id missing on one side, so only name rules fire). In production,
@@ -53,8 +56,25 @@ precision is estimated by steward sampling per rule, and recall from known links
 Lessons:
 - **Negative evidence matters as much as positive.** The queue contains identical names on the same domain with different
   tax ids: distinct companies whose names collided. Without the veto they'd be auto-merged at 0.8.
-- **Key stability.** The anchor-based key changes if a ship-only customer later matches an account. Production fix:
-  a persisted **key registry** (assign once, never reissue; merges retire the losing key).
+- **Key stability → key registry (Phase 7s2).** A key hashed from an anchor changes when a ship-only customer later
+  matches an account. Fix: **recompute identity, persist keys.** Matching stays stateless; `int_customer_key_registry`
+  assigns keys once and records every change as an appended row with a reason:
+
+  | Event | Registry | Key |
+  |---|---|---|
+  | Churn, inactivity, source deletion | nothing (a deleted record's last row = tombstone) | unchanged: not identity events |
+  | New record joins a keyed customer | `inherit` | the customer's key |
+  | Two keyed customers become one | `merge` | **oldest key wins**; the loser → `customer_key_aliases` |
+  | A match is undone (steward `no_match`) | `split` | the side that held it longest keeps it; the other gets its own or a new key |
+  | Brand-new customer | `new` | minted once (`FARM_FINGERPRINT(cluster_id ‖ invocation_id)`), never recomputed |
+
+  Adoption was a **migration**, not a reissue: an empty registry uses the old formula, so no existing key changed
+  (verified by checksum on the crosswalk, `dim_customer` and `fct_revenue`). A retired key is never handed out again
+  (singular test), so an alias lookup can't land on the wrong customer. The registry is state like a snapshot:
+  `full_refresh: false`, cloned/deferred in CI. Simulated with steward decisions: merge → alias; reverting it gave the
+  split-off side a **new** key and the old alias followed it (`retired → current`, resolved in one lookup).
+  Known simplification: migrated keys share one birth time, so a merge between two of them falls back to the
+  smallest key; a production version would use the records' `created_at` as the age.
 - **Dynamic masking vs matching.** A masked email (Phase 3) can't be matched after `lower()`. ER needs Fine-Grained
   Reader, or matching on hashes computed at the source (what RutaShip does with `email_sha256`).
 
