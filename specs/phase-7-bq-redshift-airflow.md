@@ -47,4 +47,12 @@ engines" goes before nested types break it, which is a good argument for *where*
 ## 🧭 Checkpoint
 Which pattern would you defend, and why? (Answer in your own words; we refine it together.)
 
+**Decided:** UDL on BigQuery (where it's consumed: agents, dashboards; spiky load suits serverless + per-project quotas
+and an agent slot reservation; RutaPay already there = data gravity; native nested JSON). What crosses = **contracted
+public marts** (dbt Mesh boundary), PII minimized before leaving AWS, governance reapplied in BQ. Mechanism = **batch
+replication** (UNLOAD Parquet → S3 → STS → GCS → BQ load, `WRITE_TRUNCATE`, idempotent). Accepted trade-offs: latency,
+egress, two governance planes. Change course for real-time (CDC from OLTP), egress at huge volume (Omni / federation /
+UDL on AWS), or residency rules.
+
 ## 🧠 Quiz 7: 4 questions
+- ✅ Done (2.75/4): idempotency vs failure containment, Assets, DISTKEY/SORTKEY → partition/cluster, declared vs observed lineage.
