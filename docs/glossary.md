@@ -101,7 +101,18 @@ Grows phase by phase. Format: **English** · *Español*: one-line definition.
 | Golden record | Registro maestro | The single best version of an entity assembled from all sources |
 | MDM (Master Data Management) | Gestión de datos maestros | Discipline and tooling to maintain golden records operationally |
 | Data stewardship | Custodia de datos | Humans accountable for resolving ambiguous data (e.g. the match review queue) |
+| Co-located join (DISTKEY) | Join co-localizado | Both tables distributed on the join key, so each Redshift slice joins its own rows with no network shuffle |
+| Federation (query federation) | Federación de consultas | One engine (e.g. Trino) queries several systems in place, pulling rows over the network per query |
+| Data gravity | Gravedad de los datos | Data and workloads attract each other: move the smaller/modeled side to where most data and consumers live |
+| Failure containment | Contención de fallos | A failed task stops downstream tasks from consuming a broken state (Airflow `all_success`, quality gates) |
+| Deferrable sensor | Sensor diferible | Airflow sensor that releases its worker slot while waiting (triggerer process) |
+| At-least-once delivery | Entrega al menos una vez | Webhooks/brokers retry, so duplicates arrive; consumers dedup on an event id |
 | Key registry | Registro de claves | Persisted table that assigns canonical keys once and never reissues them |
+| Survivor rule (key) | Regla de clave superviviente | Which key a merged customer keeps (here: the oldest); the other is retired |
+| Key alias (retired key) | Alias de clave (clave retirada) | Mapping from a key retired by a merge to the key that replaced it |
+| Tombstone | Lápida (tombstone) | A record kept (or marked) after deletion so references to it still resolve |
+| Identity graph | Grafo de identidad | Identifiers (tax id, email hash, source ids) linked to the canonical entity they belong to |
+| Unit test (dbt) | Test unitario (dbt) | Mocked-input test of one model's SQL logic; can mock `this` and `is_incremental()` |
 | Precision / recall | Precisión / exhaustividad | Correct merges / all merges · correct merges / all true pairs |
 | Timeline merge (SCD2) | Fusión de líneas de tiempo | Combining several SCD2 histories by unioning their change points into new intervals |
 | Pass-through revenue | Ingreso de paso | Money collected on behalf of a third party (freight for carriers): not revenue |

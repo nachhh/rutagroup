@@ -4,6 +4,28 @@ version: 2
 # (Phase 5), the knowledge graph and the agent (Phase 6) are allowed to build on.
 
 models:
+  - name: customer_key_aliases
+    description: >
+      Grain: 1 row per retired customer_key → the key that replaced it today (merges only; chains already
+      resolved). Lets consumers that stored a key before a merge keep resolving it.
+    config:
+      access: public
+      contract: {enforced: true}
+      meta: {classification: internal}
+    columns:
+      - name: retired_key
+        data_type: int64
+        description: "A key no record holds anymore (lost a merge: oldest key wins)."
+        constraints: [{type: primary_key}]
+        data_tests: [unique, not_null]
+      - name: surviving_key
+        data_type: int64
+        description: "The current customer_key of the records that held the retired key."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_customer'), field: customer_key}
+      - {name: retired_at, data_type: timestamp, description: "When the merge retired the key."}
   - name: dim_customer
     description: "Grain: 1 row per canonical customer version (SCD2, merged Ship + Pay timelines). Conformed across products."
     # SEMANTIC LAYER (Phase 5): an SCD2 dimension-only semantic model. `customer` is a NATURAL entity (not unique here)

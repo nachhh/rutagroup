@@ -4,7 +4,9 @@
   Log-based SCD2 vs dbt snapshot (polling):
     * The change log records EVERY change, so no intermediate state is lost between runs.
     * Rebuildable from scratch at any time (pure function of the log), so no snapshot state to protect.
-    * Needs the source to keep history (app change log, or CDC from the OLTP DB).
+    * Needs the source to keep history. Here: raw_pay.subscription_changes, an append-only table the billing app
+      writes in the same transaction as it updates `subscriptions` (an app change log). Alternative: CDC
+      (Debezium/Datastream) on `subscriptions` → LEAD over commit_ts; same SCD2 logic, but change_type must be derived.
   LEAD() looks at the next change for the same account: its timestamp closes the current version.
 -#}
 with changes as (

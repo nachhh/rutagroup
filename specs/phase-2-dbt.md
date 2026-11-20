@@ -10,7 +10,7 @@ in code, with a comment explaining the choice.
 | `stg_ship__shippers`, `__carriers`, `__lanes`, `__shipments` | `view` | Cheap 1:1 cleanup layer |
 | `stg_ship__shipment_events` | `view` | |
 | `int_shipments_enriched` | `ephemeral` | Inlined CTE, no object created |
-| `fct_shipments` | `incremental`, `merge`, `unique_key=shipment_id`, 3-day lookback | Late status updates. `is_incremental()`, `on_schema_change='append_new_columns'` |
+| `fct_shipments` | `incremental`, `merge`, `unique_key=shipment_id`, 3-day lookback on **both inputs** (shipments + events) | Late status updates; change detection on every table the model reads. `is_incremental()`, `on_schema_change='append_new_columns'` |
 | `fct_shipment_events` | `incremental`, `append` (or `microbatch` on `event_ts`) | Immutable event log |
 | `fct_shipment_lifecycle` | `table` | Accumulating snapshot rebuilt from events |
 | `dim_shipper` | `table` | Built from the snapshot below |
@@ -70,6 +70,9 @@ written cross-database with `adapter.dispatch`), `dbt build` vs `run` + `test`, 
 1. `fct_shipments`: **merge** on `shipment_id`, 3-day lookback on `updated_at`. The lookback = worst expected *ingestion*
    delay (not shipment duration). The best practice is filtering on a load timestamp; mitigations are a periodic full refresh and reconciliation tests.
    `scripts/day2_ship.py` simulates a late arrival 2 days behind (caught) and one 5 days behind (missed).
+   *Revision:* the model also reads events (`delivered_at`, `had_exception`), so the incremental filter picks up
+   shipments whose row changed **or** that have new events, both against the same source-clock watermark. We don't
+   rely on the source bumping `shipments.updated_at` when an event lands. The reconciliation test checks both inputs.
 2. Primary address: `is_primary` → first billing → any (`ARRAY_AGG ... ORDER BY ... LIMIT 1`).
 3. `fct_invoice_lines`: `insert_overwrite` rebuilding the last **7 days** of partitions + a monthly full refresh.
 4. Invoice total vs lines: singular test, €0.01 tolerance, `warn_if: ">0"`, `error_if: ">10"`.

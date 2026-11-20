@@ -13,7 +13,7 @@ joining two facts directly at different grains.
 
 | Model | Grain | Fact type | Load pattern | Measures (additivity) |
 |---|---|---|---|---|
-| `fct_shipments` | 1 row per shipment | Transaction (with current status) | Incremental `merge` on `shipment_id` (status changes late) | `gmv`, `booking_fee` (additive); `is_on_time` (flag, feeds a ratio) |
+| `fct_shipments` | 1 row per shipment | Transaction (with current status) | Incremental `merge` on `shipment_id` (status changes late); re-reads shipments with a changed row **or** new events | `gmv`, `booking_fee` (additive); `is_on_time` (flag, feeds a ratio) |
 | `fct_shipment_events` | 1 row per tracking event | Transaction, **append-only** | Incremental `append`: events are immutable and arrive unannounced | count of events |
 | `fct_shipment_lifecycle` | 1 row per shipment, milestone columns filled in over time | **Accumulating snapshot** | Rebuilt (`table`) from events: `booked_at`, `picked_up_at`, `delivered_at`, lags in hours | lag hours (additive per row, usually averaged) |
 | `fct_invoice_lines` | 1 row per invoice line | Transaction | Incremental `insert_overwrite` on `issued_date` partitions | `amount` (additive), `qty` |
@@ -21,6 +21,26 @@ joining two facts directly at different grains.
 | `fct_customer_monthly` | 1 row per customer per month | **Periodic snapshot** | `table` | `mrr` (**semi-additive**: sums across customers, not across months), `shipments`, `gmv` |
 | `fct_revenue` (Phase 4) | 1 row per revenue-bearing line, across both products | Transaction (unified) | `table` | `revenue_eur` (additive) |
 | `fct_product_enrollment` | 1 row per customer × product | **Factless** (coverage) | `table` | none; count rows ("customers on both products") |
+
+> **Note: `fct_shipments` vs `fct_shipment_lifecycle` is a teaching split.** Both are 1 row per
+> shipment built from the same inputs; the second exists only to show an accumulating snapshot. In a
+> real project they would be **one** model (`fct_shipments` carrying the milestone columns), because:
+> - two models at the same grain duplicate columns (`delivered_at`, `is_on_time` vs `hours_late`);
+> - `status` (source) and `current_milestone` (derived from events) are two definitions of the same
+>   concept that can disagree, which is the drift a semantic layer is meant to prevent.
+>
+> Keep them separate only when the **grain** differs (per shipment leg/stop) or the **owner or
+> contract/SLA** differs (ops milestones vs finance GMV).
+
+**Change detection on every input.** `fct_shipments` reads two tables: shipments (status, GMV) and
+events (`delivered_at`, `had_exception`). Its incremental filter re-reads a shipment if its own row
+changed **or** it has new events, both against the same source-clock watermark (`max(updated_at)`).
+We enforce this instead of assuming the source always bumps `shipments.updated_at` when an event
+lands. That assumption breaks when the two tables replicate with different lag (the shipment row
+arrives before its `delivered` event), when an event doesn't change the shipment row, or when a script
+bypasses `updated_at`. The reconciliation test
+(`assert_fct_shipments_reconciles_with_source`) also checks both inputs, so drift beyond the lookback
+shows up as a warning until a `--full-refresh`.
 
 **Additivity cheat sheet**
 - **Additive:** can be summed across every dimension (`gmv`, `revenue`).

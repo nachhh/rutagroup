@@ -7,7 +7,8 @@ are two projects, and the hop between them is a Python replication script that d
 needs one explicit contract on each side, and both already exist:
   * ruta_ship exposure `udl_replication` = the models that get replicated (the script reads the same exposure);
   * ruta_udl source `ship_replica.<model name>` = where they land.
-Same name on both sides → we can draw the edge. In production the same job is done by OpenLineage events
+Same MODEL name on both sides (ruta_ship model `fct_shipments` ↔ ruta_udl source table `ship_replica.fct_shipments`)
+→ we can draw the edge. It's a naming convention: renaming the source table silently breaks the edge. In production the same job is done by OpenLineage events
 (Airflow provider + `dbt-ol`) collected in Marquez / DataHub / Dataplex; this script shows what that graph contains.
 
 Level of detail: sources, PUBLIC models (the data products), semantic models → metrics, exposures (consumers).

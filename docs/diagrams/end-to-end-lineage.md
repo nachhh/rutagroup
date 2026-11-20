@@ -23,18 +23,6 @@ flowchart LR
   subgraph ruta_ship___Postgres___Redshift___exposures["ruta_ship · Postgres = Redshift · exposures"]
     exposure_ruta_ship_udl_replication(["udl_replication (UNLOAD → S3 → GCS → BQ)"])
   end
-  subgraph ruta_udl___BigQuery___models["ruta_udl · BigQuery · models"]
-    model_ruta_udl_dim_customer["dim_customer"]
-    model_ruta_udl_dim_date["dim_date"]
-    model_ruta_udl_fct_customer_monthly["fct_customer_monthly"]
-    model_ruta_udl_fct_invoice_lines["fct_invoice_lines"]
-    model_ruta_udl_fct_payments["fct_payments"]
-    model_ruta_udl_fct_product_enrollment["fct_product_enrollment"]
-    model_ruta_udl_fct_revenue["fct_revenue"]
-    model_ruta_udl_fct_udl_shipments["fct_udl_shipments"]
-    model_ruta_udl_kg_edges["kg_edges"]
-    model_ruta_udl_kg_nodes["kg_nodes"]
-  end
   subgraph ruta_udl___BigQuery___sources["ruta_udl · BigQuery · sources"]
     source_ruta_udl_raw_pay_accounts[("raw_pay.accounts")]
     source_ruta_udl_raw_pay_invoices[("raw_pay.invoices")]
@@ -45,6 +33,19 @@ flowchart LR
     source_ruta_udl_ship_replica_dim_shipper[("ship_replica.dim_shipper")]
     source_ruta_udl_ship_replica_fct_shipment_lifecycle[("ship_replica.fct_shipment_lifecycle")]
     source_ruta_udl_ship_replica_fct_shipments[("ship_replica.fct_shipments")]
+  end
+  subgraph ruta_udl___BigQuery___models["ruta_udl · BigQuery · models"]
+    model_ruta_udl_customer_key_aliases["customer_key_aliases"]
+    model_ruta_udl_dim_customer["dim_customer"]
+    model_ruta_udl_dim_date["dim_date"]
+    model_ruta_udl_fct_customer_monthly["fct_customer_monthly"]
+    model_ruta_udl_fct_invoice_lines["fct_invoice_lines"]
+    model_ruta_udl_fct_payments["fct_payments"]
+    model_ruta_udl_fct_product_enrollment["fct_product_enrollment"]
+    model_ruta_udl_fct_revenue["fct_revenue"]
+    model_ruta_udl_fct_udl_shipments["fct_udl_shipments"]
+    model_ruta_udl_kg_edges["kg_edges"]
+    model_ruta_udl_kg_nodes["kg_nodes"]
   end
   subgraph ruta_udl___BigQuery___exposures["ruta_udl · BigQuery · exposures"]
     exposure_ruta_udl_exec_dashboard(["exec_dashboard"])
@@ -109,6 +110,7 @@ flowchart LR
   source_ruta_ship_raw_ship_shipments --> model_ruta_ship_fct_shipment_lifecycle
   source_ruta_ship_raw_ship_shipments --> model_ruta_ship_fct_shipments
   source_ruta_ship_raw_ship_shippers --> model_ruta_ship_dim_shipper_v2
+  source_ruta_udl_raw_pay_accounts --> model_ruta_udl_customer_key_aliases
   source_ruta_udl_raw_pay_accounts --> model_ruta_udl_dim_customer
   source_ruta_udl_raw_pay_accounts --> model_ruta_udl_fct_customer_monthly
   source_ruta_udl_raw_pay_accounts --> model_ruta_udl_fct_product_enrollment
@@ -128,6 +130,7 @@ flowchart LR
   source_ruta_udl_ship_replica_dim_carrier --> model_ruta_udl_kg_nodes
   source_ruta_udl_ship_replica_dim_lane --> model_ruta_udl_kg_edges
   source_ruta_udl_ship_replica_dim_lane --> model_ruta_udl_kg_nodes
+  source_ruta_udl_ship_replica_dim_shipper --> model_ruta_udl_customer_key_aliases
   source_ruta_udl_ship_replica_dim_shipper --> model_ruta_udl_dim_customer
   source_ruta_udl_ship_replica_dim_shipper --> model_ruta_udl_fct_customer_monthly
   source_ruta_udl_ship_replica_dim_shipper --> model_ruta_udl_fct_product_enrollment

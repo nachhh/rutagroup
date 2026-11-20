@@ -1,6 +1,15 @@
 -- grain: 1 row per shipment; milestone columns fill in over time → ACCUMULATING SNAPSHOT.
 -- Rebuilt as a table (cheap at 69k rows). At 500M: incremental merge on the shipment ids touched by
 -- new events + incremental_predicates to prune closed shipments (see quiz 1, Q5).
+--
+-- TEACHING SPLIT: this model exists to show the accumulating-snapshot pattern next to fct_shipments
+-- (transaction fact). Here both have the SAME grain and the SAME inputs (stg_ship__shipments +
+-- int_shipment_event_rollup), so in a real project they would be ONE model: fct_shipments would carry
+-- the milestone columns below and be the accumulating snapshot itself.
+--   * Smell to notice: current_milestone (derived from events) and fct_shipments.status (from the
+--     source) are two definitions of "status" that can disagree. One model = one definition.
+--   * A separate model IS justified when the grain differs (e.g. per shipment leg/stop) or the owner or
+--     contract/SLA differs (ops milestones vs finance GMV).
 {{ config(materialized='table', indexes=[{'columns': ['shipment_id'], 'unique': True}]) }}
 
 select

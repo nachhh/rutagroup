@@ -117,8 +117,9 @@ with DAG(
             "&& uv run python scripts/check_governance.py",
             retries=0,
         )
+        # `run --empty` first: unit tests that mock the key registry's `this` need the table to EXIST (no-op once it does)
         udl_build = sh(
-            "udl_build", "cd dbt/ruta_udl && uv run dbt build",
+            "udl_build", "cd dbt/ruta_udl && uv run dbt run --empty -q -s int_customer_key_registry && uv run dbt build",
             inlets=[SHIP_REPLICA, PAY_RAW], outlets=[UDL_MARTS, UDL_KG],
         )
         kg_codegen >> gate >> udl_build

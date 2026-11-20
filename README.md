@@ -202,7 +202,8 @@ Total ≈ 7.75 h. That is the top of the budget. If we run behind, cut in this o
 - [x] Phase 4: UDL / ontology / KG
 - [x] Phase 5: Semantic Layer / MetricFlow
 - [x] Phase 6: NL + MCP agent
-- [ ] Phase 7: BigQuery + Redshift + Airflow
+- [x] Phase 7: BigQuery + Redshift + Airflow
+  - [x] Phase 7s2: extras ([spec](specs/phase-7s2-extras.md)): change detection on every input, customer key registry
 - [ ] Phase 8: Wrap-up
 
 ## 5. Repo layout (target)
