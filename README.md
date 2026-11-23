@@ -7,7 +7,11 @@ combining BigQuery with Redshift**, built on a small made-up multi-product compa
 How the project is run:
 - **Spec-driven.** Each phase has a spec in [specs/](specs/).
 - **Checkpoints and quizzes.** Phases include 🧭 decision checkpoints and 🧠 quizzes.
-- **Docs.** Command cheat sheet: [docs/dbt_commands.md](docs/dbt_commands.md). Concept notes are in [docs/](docs/), diagrams in [docs/diagrams/](docs/diagrams/), and a bilingual
+- **Docs.** Start with the one-page [cheatsheet](docs/08_cheatsheet.md) (every topic + where it lives + trade-offs,
+  and a 2-minute walkthrough). Concept notes per phase: [01 modeling](docs/01_modeling.md) ·
+  [03 governance](docs/03_governance.md) · [04 UDL/ontology](docs/04_udl_ontology.md) ·
+  [05 semantic layer](docs/05_semantic_layer.md) · [07 BQ+Redshift+Airflow](docs/07_bq_redshift_airflow.md).
+  Commands: [dbt_commands.md](docs/dbt_commands.md). Diagrams in [docs/diagrams/](docs/diagrams/), and a bilingual
   [glossary](docs/glossary.md).
 - **Time budget.** Two sessions of 3–4 h each.
 
@@ -36,7 +40,7 @@ gcloud auth application-default set-quota-project <your-project-id>
 cp .env.example .env                     # set GCP_PROJECT=<your-project-id>
 cp profiles.example.yml profiles.yml     # dbt profiles; the Makefile points DBT_PROFILES_DIR here
 
-# 3. Python env + dbt packages
+# 3. Python env + dbt packages (if another venv is active, run `deactivate` first: uv ignores a foreign VIRTUAL_ENV)
 uv sync
 make deps
 
@@ -47,9 +51,11 @@ make load        # RutaShip CSV → Postgres raw_ship ; RutaPay JSONL → BigQue
 make debug       # dbt debug in both projects
 make pg-roles    # least-privilege roles in Postgres (needed before the first `make ship`)
 
-# 5. Build
+# 5. Build (order matters: the UDL reads the replicated RutaShip marts)
 make ship        # dbt build: ruta_ship on Postgres
-make udl         # dbt build: ruta_udl on BigQuery
+make replicate   # RutaShip public marts → BigQuery ship_replica
+make udl         # dbt build: ruta_udl on BigQuery. The customer key registry is state (full_refresh=false):
+                 # `dbt build --full-refresh` never resets it; to start over, drop udl_intermediate.int_customer_key_registry
 
 # 6. Governance (Phase 3)
 make govern         # policy checks over both manifest.json files (CI gate)
@@ -57,7 +63,7 @@ make bq-governance  # BQ policy tag + dynamic masking + authorized view (re-run 
 make day2           # optional: simulate day-2 source changes, then `make snapshot ship`
 
 # 7. UDL, entity resolution, ontology + knowledge graph (Phase 4)
-make replicate      # RutaShip public marts → BigQuery ship_replica (then `make udl`)
+make replicate      # re-run after RutaShip changes (e.g. `make day2`), then `make udl`
 make ontology       # regenerate kg_nodes / kg_edges dbt models from ontology/ruta_ontology.yml
 make eval-er        # entity-resolution precision / recall vs the generator's ground truth
 
@@ -204,9 +210,9 @@ Total ≈ 7.75 h. That is the top of the budget. If we run behind, cut in this o
 - [x] Phase 6: NL + MCP agent
 - [x] Phase 7: BigQuery + Redshift + Airflow
   - [x] Phase 7s2: extras ([spec](specs/phase-7s2-extras.md)): change detection on every input, customer key registry
-- [ ] Phase 8: Wrap-up
+- [x] Phase 8: Wrap-up ([cheatsheet](docs/08_cheatsheet.md))
 
-## 5. Repo layout (target)
+## 5. Repo layout
 
 ```
 docker-compose.yml  Makefile  pyproject.toml  .env.example  profiles.example.yml
@@ -218,5 +224,5 @@ mcp_server/         metrics MCP server (wraps MetricFlow + the KG)
 agent/              tiny NL agent (MCP client + LLM)
 airflow/dags/       ruta_pipeline.py
 specs/              one spec per phase
-docs/               concept notes, glossary.md, diagrams/
+docs/               concept notes (01–07), 08_cheatsheet.md, glossary.md, diagrams/
 ```
