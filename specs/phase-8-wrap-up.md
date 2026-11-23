@@ -9,3 +9,9 @@
 - `docs/glossary.md`: final pass (EN ↔ ES).
 - Mock Q&A round in chat (~10 questions, conversational). Results go to `quizzes/mock-interview.md` (gitignored).
 - README progress tracker updated, plus "how to run" instructions.
+
+## Status log
+- ✅ Cheatsheet (11 topics + 2-minute walkthrough), glossary final pass (duplicates merged, 12 terms added), README
+  (docs map, quick-start order fixed: ship → replicate → udl, key-registry full-refresh warning).
+- ✅ Mock Q&A: 10 questions done (2 strong, 8 partial, 0 wrong). Recurring gaps: concrete diagnostics, measurement
+  (evals, SLOs, reconciliation, unit cost) and the people/process side. Notes kept in the gitignored quiz folder.

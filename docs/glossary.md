@@ -58,7 +58,7 @@ Grows phase by phase. Format: **English** · *Español*: one-line definition.
 | Change log | Registro de cambios | App-written table with one row per business change (log-based history) |
 | CDC (Change Data Capture) | Captura de cambios de datos | Streaming row changes from a DB transaction log (Debezium, DMS, Datastream) |
 | Data test (generic / singular) | Test de datos (genérico / singular) | Query that returns failing rows; YAML-declared reusable vs one-off SQL file |
-| Unit test (dbt) | Test unitario | Mocked inputs → expected outputs to test model logic without real data |
+| Unit test (dbt) | Test unitario (dbt) | Mocked inputs → expected outputs to test model logic without real data; can mock `this` and `is_incremental()` |
 | Source freshness | Frescura de fuentes | SLA check on how recent a source's data is (loaded_at_field or table metadata) |
 | store_failures | Guardar fallos | Persist a test's failing rows in a table for debugging |
 | Reconciliation test | Test de conciliación | Compares source vs target to detect rows an incremental missed |
@@ -112,7 +112,6 @@ Grows phase by phase. Format: **English** · *Español*: one-line definition.
 | Key alias (retired key) | Alias de clave (clave retirada) | Mapping from a key retired by a merge to the key that replaced it |
 | Tombstone | Lápida (tombstone) | A record kept (or marked) after deletion so references to it still resolve |
 | Identity graph | Grafo de identidad | Identifiers (tax id, email hash, source ids) linked to the canonical entity they belong to |
-| Unit test (dbt) | Test unitario (dbt) | Mocked-input test of one model's SQL logic; can mock `this` and `is_incremental()` |
 | Precision / recall | Precisión / exhaustividad | Correct merges / all merges · correct merges / all true pairs |
 | Timeline merge (SCD2) | Fusión de líneas de tiempo | Combining several SCD2 histories by unioning their change points into new intervals |
 | Pass-through revenue | Ingreso de paso | Money collected on behalf of a third party (freight for carriers): not revenue |
@@ -132,7 +131,6 @@ Grows phase by phase. Format: **English** · *Español*: one-line definition.
 | Time spine | Calendario base (time spine) | One row per day; used for cumulative windows, offsets and gap filling |
 | Simple / ratio / derived / cumulative / conversion metric | Tipos de métrica | The five MetricFlow metric types (conversion = funnel within a window) |
 | Semi-additive measure | Medida semiaditiva | Sums across some dimensions but not time (MRR, balances): take the last snapshot |
-| Fan-out | Multiplicación de filas (fan-out) | A one-to-many join that duplicates rows and inflates sums |
 | Saved query / export | Consulta guardada / exportación | A named metric request; an export materializes it as a table |
 | Headless BI | BI sin interfaz (headless) | Metrics served as an API, independent of any front end |
 | Open Semantic Interchange (OSI) | OSI | Industry effort for one portable semantic-layer spec |
@@ -162,3 +160,15 @@ Grows phase by phase. Format: **English** · *Español*: one-line definition.
 | DISTKEY / SORTKEY | Clave de distribución / de orden | Redshift physical design: node co-location and block pruning |
 | SUPER (Redshift) | SUPER | Redshift semi-structured type, queried with PartiQL |
 | RPU | Unidad de procesamiento de Redshift | Redshift Serverless compute/billing unit |
+| Egress | Tráfico de salida (egress) | Data leaving a cloud provider's network; billed per GB, the main cost of cross-cloud copies |
+| Editions / slot reservation | Ediciones / reserva de slots | BigQuery capacity pricing: a pool of slots assigned to projects, for predictable cost and workload isolation |
+| Column-level lineage | Linaje a nivel de columna | Which source columns feed each output column (OpenLineage facets, catalogs) |
+| dbt Mesh | dbt Mesh | Several dbt projects linked by public, contracted models (cross-project `ref`), one per team/domain |
+| Data mesh | Data mesh | Domains own and publish data products; a platform team provides tooling; governance is federated |
+| Team Topologies | Topologías de equipo | Stream-aligned, platform and enabling teams, and how they interact |
+| ADR (Architecture Decision Record) | Registro de decisión de arquitectura | Short record per decision: context, options, decision, consequences |
+| Design doc / RFC | Documento de diseño / RFC | Proposal circulated before building, to gather objections cheaply |
+| Thin vertical slice | Corte vertical fino | One use case delivered end to end (source → model → metric → consumer) before widening |
+| Paved road | Camino pavimentado | The supported default way of doing things, made the easiest one (templates, CI, make targets) |
+| Build vs buy | Construir vs comprar | Custom code vs managed/vendor tools: cost, lock-in, skills, time to value |
+| FinOps / cost attribution | FinOps / atribución de costes | Making cloud cost visible per team/workload (labels, projects, reservations) so owners act on it |
