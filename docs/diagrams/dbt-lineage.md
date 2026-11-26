@@ -4,6 +4,7 @@ Materializations: 🟦 view · ⬜ ephemeral · 🟩 table · 🟧 incremental �
 
 Access (Phase 3): staging/intermediate are `private`; public data products are `fct_shipments`, `fct_shipment_lifecycle`,
 `dim_shipper` v2, `dim_carrier`, `dim_lane` (ship) and `fct_invoice_lines`, `fct_payments`, `dim_date` (udl). Everything else is `protected`.
+Phase 7s2 adds `customer_key_aliases` as a public, contracted UDL mart.
 
 ## ruta_ship (Postgres ≈ Redshift)
 
@@ -72,7 +73,14 @@ flowchart LR
   pairs --> matches[int_customer_matches]:::view
   sd[seed_match_decisions]:::seed --> matches
   pairs --> queue[int_customer_review_queue]:::view
-  matches --> xwalk[int_customer_xwalk]:::view
+  %% Phase 7s2: persisted key registry (recompute identity, persist keys)
+  matches --> clusters[int_customer_clusters<br/>record → cluster_id · no key]:::view
+  cand --> clusters
+  clusters --> reg[int_customer_key_registry<br/>append-only · full_refresh=false]:::inc
+  reg -. "reads {{ this }}: current keys" .-> reg
+  clusters --> xwalk[int_customer_xwalk<br/>customer_key from registry]:::view
+  reg --> xwalk
+  reg --> aliases[customer_key_aliases<br/>retired → surviving key · PUBLIC]:::table
   xwalk --> dimc[dim_customer<br/>timeline-merge SCD2]:::table
   scd2 --> dimc
   xwalk --> frev[fct_revenue<br/>EUR at month avg]:::table
